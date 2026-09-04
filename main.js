@@ -3,6 +3,8 @@ const { Plugin, ItemView, Modal, Setting, Notice, TFile } = require("obsidian");
 const VIEW_TYPE = "personal-launchpad-view";
 const DATA_FOLDER = "个人成长系统/配置";
 const DATA_PATH = `${DATA_FOLDER}/launchpad.json`;
+const DEFAULT_WIDGETS = ["capture", "focus", "tasks", "growth", "health", "milestone", "week", "shortcuts", "library", "recent"];
+const WIDGET_NAMES = { capture: "闪念", focus: "今日重点", tasks: "今日行动", growth: "当前成长", health: "身体系统", milestone: "下一交付物", week: "本周复盘", shortcuts: "快捷入口", library: "在读书库", recent: "今日闪念" };
 
 const DAILY_MESSAGES = [
   { text: "行而不辍，未来可期。", source: "《荀子》" },
@@ -37,6 +39,7 @@ function escapeHtml(text) {
   return String(text || "").replace(/[&<>'\"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[c]));
 }
 function defaultTasks(stage) { return (GROWTH_PHASES.find(phase => phase.name === stage) || GROWTH_PHASES[0]).tasks; }
+function defaultDashboard() { return { order: [...DEFAULT_WIDGETS], hidden: [], customWidgets: [] }; }
 function freshData() {
   return {
     version: 3,
@@ -53,6 +56,7 @@ function freshData() {
     ],
     books: [],
     health: { weeklyGoal: 3, workouts: [] },
+    dashboard: defaultDashboard(),
     days: {}
   };
 }
@@ -146,6 +150,49 @@ class WorkoutModal extends Modal {
   }
 }
 
+class CustomWidgetModal extends Modal {
+  constructor(app, plugin, onSave) { super(app); this.plugin = plugin; this.onSave = onSave; }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.createEl("h2", { text: "添加自定义卡片" });
+    let type = "note", title = "", content = "", value = "0", goal = "";
+    new Setting(contentEl).setName("卡片类型").addDropdown(dropdown => dropdown
+      .addOptions({ note: "文本 / 提醒", link: "链接入口", counter: "目标计数器" }).setValue(type).onChange(input => type = input));
+    new Setting(contentEl).setName("标题").addText(input => input.setPlaceholder("例如：本月主题").onChange(input => title = input));
+    new Setting(contentEl).setName("内容").setDesc("文本卡片填写内容；链接卡片填写网址；计数器填写说明。").addTextArea(input => input.setPlaceholder("例如：https://... 或写下提醒").onChange(input => content = input));
+    new Setting(contentEl).setName("当前值").setDesc("仅计数器使用").addText(input => input.setValue(value).onChange(input => value = input));
+    new Setting(contentEl).setName("目标值").setDesc("仅计数器使用，可留空").addText(input => input.setPlaceholder("例如：30").onChange(input => goal = input));
+    new Setting(contentEl).addButton(button => button.setButtonText("添加到主页").setCta().onClick(async () => {
+      if (!title.trim()) return new Notice("请先填写卡片标题。");
+      if (type === "link" && !/^https?:\/\//.test(content.trim())) return new Notice("链接卡片需要以 http:// 或 https:// 开头。");
+      await this.plugin.addCustomWidget({ type, title: title.trim(), content: content.trim(), value: Math.max(0, Number(value) || 0), goal: Math.max(0, Number(goal) || 0) });
+      this.onSave(); this.close();
+    }));
+  }
+}
+
+class DashboardLayoutModal extends Modal {
+  constructor(app, plugin, onSave) { super(app); this.plugin = plugin; this.onSave = onSave; }
+  onOpen() { this.render(); }
+  render() {
+    const { contentEl } = this, dashboard = this.plugin.getDashboard();
+    contentEl.empty(); contentEl.createEl("h2", { text: "定制主页" });
+    contentEl.createEl("p", { text: "开关控制是否显示；上下箭头调整顺序。移除卡片不会删除笔记或训练记录。" });
+    for (const id of dashboard.order) {
+      const custom = dashboard.customWidgets.find(widget => widget.id === id);
+      const title = custom ? custom.title : WIDGET_NAMES[id];
+      if (!title) continue;
+      new Setting(contentEl).setName(title).setDesc(custom ? "自定义卡片" : "系统卡片")
+        .addToggle(toggle => toggle.setValue(!dashboard.hidden.includes(id)).onChange(async visible => { await this.plugin.setWidgetVisibility(id, visible); this.onSave(); }))
+        .addExtraButton(button => button.setIcon("chevron-up").setTooltip("上移").onClick(async () => { await this.plugin.moveWidget(id, -1); this.onSave(); this.render(); }))
+        .addExtraButton(button => button.setIcon("chevron-down").setTooltip("下移").onClick(async () => { await this.plugin.moveWidget(id, 1); this.onSave(); this.render(); }));
+      if (custom) new Setting(contentEl).setName("移除「" + title + "」").setDesc("只移除这张卡片，不影响其它笔记。")
+        .addButton(button => button.setButtonText("移除").setWarning().onClick(async () => { await this.plugin.removeCustomWidget(id); this.onSave(); this.render(); }));
+    }
+    new Setting(contentEl).setName("新卡片").setDesc("可以添加文本、链接入口或目标计数器。").addButton(button => button.setButtonText("添加自定义卡片").setCta().onClick(() => new CustomWidgetModal(this.app, this.plugin, () => { this.onSave(); this.render(); }).open()));
+  }
+}
+
 class LaunchpadView extends ItemView {
   constructor(leaf, plugin) { super(leaf); this.plugin = plugin; }
   getViewType() { return VIEW_TYPE; }
@@ -185,25 +232,25 @@ class LaunchpadView extends ItemView {
         <blockquote>${escapeHtml(message.text)}</blockquote>
         <div class="lp-source">— ${escapeHtml(message.source || "每日推送")}</div>
         <div class="lp-plan-progress" aria-label="180 天计划进度"><i style="width:${growthState.planPercent}%"></i><span>180 天计划 · 第 ${growthState.day} 天 · ${growthState.planPercent}%</span></div>
-        <div class="lp-banner-actions"><button data-action="daily-mode" class="${!custom ? "is-active" : ""}">每日推送</button><button data-action="custom-mode" class="${custom ? "is-active" : ""}">自定义</button><button data-action="edit-banner" aria-label="编辑横幅">⚙</button></div>
+        <div class="lp-banner-actions"><button data-action="daily-mode" class="${!custom ? "is-active" : ""}">每日推送</button><button data-action="custom-mode" class="${custom ? "is-active" : ""}">自定义</button><button data-action="edit-banner" aria-label="编辑横幅">⚙</button><button data-action="customize-dashboard" aria-label="定制主页">▦</button></div>
       </section>
       <main class="lp-grid">
-        <section class="lp-card lp-capture-card">
+        <section class="lp-card lp-capture-card" data-widget="capture">
           <div class="lp-heading"><span>✦ 闪念</span><small>先捕捉，后整理</small></div>
           <textarea data-role="flash" placeholder="现在想到什么？"></textarea>
           <div class="lp-capture-footer"><select data-role="flash-type"><option>闪念</option><option>待办</option><option>复盘</option><option>外部反馈</option><option>项目</option><option>AI问题</option></select><button data-action="save-flash" class="lp-primary">保存闪念</button></div>
         </section>
-        <section class="lp-card lp-focus-card">
+        <section class="lp-card lp-focus-card" data-widget="focus">
           <div class="lp-heading"><span>◎ 今天最重要的一件事</span><button data-action="edit-focus" class="lp-icon-button">编辑</button></div>
           <div class="lp-focus-text">${escapeHtml(day.focus || "还没有写下。先给今天一个清晰的方向。")}</div>
         </section>
-        <section class="lp-card lp-tasks-card">
+        <section class="lp-card lp-tasks-card" data-widget="tasks">
           <div class="lp-heading"><span>✓ 今日行动</span><small>${done} / ${day.tasks.length}</small></div>
           <div class="lp-progress"><i style="width:${day.tasks.length ? Math.round(done / day.tasks.length * 100) : 0}%"></i></div>
           <div class="lp-task-list">${day.tasks.map((task, index) => `<div class="lp-task ${task.done ? "is-done" : ""}"><label><input type="checkbox" data-task="${index}" ${task.done ? "checked" : ""}><span>${escapeHtml(task.text)}</span></label><span class="lp-task-actions"><button data-edit-task="${index}" aria-label="编辑任务">✎</button><button data-delete-task="${index}" aria-label="删除任务">×</button></span></div>`).join("")}</div>
           <button data-action="add-task" class="lp-text-button">＋ 添加临时任务</button>
         </section>
-        <section class="lp-card lp-growth-card">
+        <section class="lp-card lp-growth-card" data-widget="growth">
           <div class="lp-heading"><span>🧭 当前成长</span><button data-action="edit-growth" class="lp-icon-button">编辑</button></div>
           <strong>${escapeHtml(growthState.phase.name)} · 第 ${growthState.week} 周</strong>
           <p>${escapeHtml(growthState.phase.goal)}</p>
@@ -211,40 +258,42 @@ class LaunchpadView extends ItemView {
           <small>本阶段第 ${growthState.phaseWeek} / ${growthState.phase.to - growthState.phase.from + 1} 周</small>
           <div class="lp-feedback"><span>本周外部反馈</span><b>${this.plugin.weekFeedbackCount()} / 1</b><button data-action="feedback">记录</button></div>
         </section>
-        <section class="lp-card lp-health-card">
+        <section class="lp-card lp-health-card" data-widget="health">
           <div class="lp-heading"><span>◉ 身体系统</span><button data-action="workout" class="lp-icon-button">＋ 记录训练</button></div>
           <strong>${health.today.length ? `今天已训练 ${health.today.length} 次` : "今天还没有训练记录"}</strong>
           <p>${escapeHtml(growthState.phase.healthFocus)}</p>
           <div class="lp-health-kpis"><span><b>${health.sessions}</b><small>本周训练 / ${health.goal}</small></span><span><b>${health.minutes}</b><small>训练分钟</small></span><span><b>${health.latestWeight ? `${health.latestWeight}kg` : "—"}</b><small>最近体重</small></span></div>
           <div class="lp-inline-actions"><button data-action="workout" class="lp-text-button">${health.today.length ? "补充训练" : "记录今天训练"}</button><button data-action="open-health" class="lp-text-button">查看记录</button></div>
         </section>
-        <section class="lp-card lp-milestone-card">
+        <section class="lp-card lp-milestone-card" data-widget="milestone">
           <div class="lp-heading"><span>◈ 下一交付物</span><small>第 ${growthState.milestone.week} 周</small></div>
           <strong>${escapeHtml(growthState.milestone.title)}</strong>
           <p class="lp-alert ${growthState.alert.level}">${escapeHtml(growthState.alert.message)}</p>
           <div class="lp-inline-actions"><button data-action="milestone-template" class="lp-text-button">打开模板</button><button data-action="complete-milestone" class="lp-text-button">${growthState.milestoneDone ? "✓ 已完成" : "标记为完成"}</button></div>
         </section>
-        <section class="lp-card lp-week-card">
+        <section class="lp-card lp-week-card" data-widget="week">
           <div class="lp-heading"><span>◒ 本周复盘</span><small>${weekly.completed} / ${weekly.total} 项完成</small></div>
           <div class="lp-week-kpis"><span><b>${weekly.rate}%</b><small>行动完成率</small></span><span><b>${weekly.feedback}</b><small>外部反馈</small></span><span><b>${weekly.flashes}</b><small>闪念捕捉</small></span></div>
           <button data-action="weekly-review" class="lp-primary">打开本周复盘</button>
         </section>
-        <section class="lp-card lp-shortcuts-card">
+        <section class="lp-card lp-shortcuts-card" data-widget="shortcuts">
           <div class="lp-heading"><span>⚡ 快捷入口</span></div>
           <div class="lp-shortcuts">${data.shortcuts.map((item, index) => `<button data-shortcut="${index}"><i>${escapeHtml(item.icon)}</i><span>${escapeHtml(item.label)}</span></button>`).join("")}</div>
         </section>
-        <section class="lp-card lp-library-card">
+        <section class="lp-card lp-library-card" data-widget="library">
           <div class="lp-heading"><span>▤ 在读书库</span><button data-action="add-book" class="lp-icon-button">＋ 添加书籍</button></div>
           <div class="lp-library-list">${reading.length ? reading.slice(0, 3).map(book => {
             const actualIndex = books.indexOf(book), percent = book.total ? Math.min(100, Math.round(book.current / book.total * 100)) : 0;
             return `<button class="lp-book" data-book="${actualIndex}"><span class="lp-book-cover">${escapeHtml((book.title || "书").slice(0, 1))}</span><span class="lp-book-info"><b>${escapeHtml(book.title)}</b><small>${escapeHtml(book.author || "未填写作者")} · ${book.total ? `${book.current || 0}/${book.total} 页` : "记录阅读感受"}</small><i><em style="width:${percent}%"></em></i></span></button>`;
           }).join("") : "<div class=\"lp-empty-library\"><span>正在读的书会出现在这里</span><button data-action=\"add-book\">添加第一本书</button></div>"}</div>
         </section>
-        <section class="lp-card lp-recent-card">
+        <section class="lp-card lp-recent-card" data-widget="recent">
           <div class="lp-heading"><span>◷ 今日闪念</span><button data-action="open-flashes" class="lp-icon-button">查看全部</button></div>
           <div class="lp-recent-list">${day.flashes.length ? day.flashes.slice(-4).reverse().map((f, reverseIndex) => { const index = day.flashes.length - 1 - reverseIndex; return `<div><b>${escapeHtml(f.type)}</b><span>${escapeHtml(f.text)}</span>${f.type === "待办" ? `<button data-flash-to-task="${index}">加入行动</button>` : ""}</div>`; }).join("") : "<p>还没有记录。第一条闪念从这里开始。</p>"}</div>
         </section>
+        ${this.plugin.renderCustomWidgets()}
       </main>`;
+    this.plugin.applyDashboardLayout(root);
     this.bindEvents();
   }
   bindEvents() {
@@ -266,10 +315,14 @@ class LaunchpadView extends ItemView {
     this.contentEl.querySelectorAll("[data-action]").forEach(button => button.addEventListener("click", () => this.handleAction(button.dataset.action)));
     this.contentEl.querySelectorAll("[data-shortcut]").forEach(button => button.addEventListener("click", () => this.plugin.runShortcut(this.plugin.data.shortcuts[Number(button.dataset.shortcut)])));
     this.contentEl.querySelectorAll("[data-book]").forEach(button => button.addEventListener("click", () => this.plugin.updateBook(Number(button.dataset.book))));
+    this.contentEl.querySelectorAll("[data-delete-widget]").forEach(button => button.addEventListener("click", async () => { await this.plugin.removeCustomWidget(button.dataset.deleteWidget); new Notice("卡片已移除"); await this.render(); }));
+    this.contentEl.querySelectorAll("[data-open-widget-link]").forEach(button => button.addEventListener("click", () => window.open(button.dataset.openWidgetLink, "_blank")));
+    this.contentEl.querySelectorAll("[data-update-counter]").forEach(button => button.addEventListener("click", () => this.plugin.updateCustomCounter(button.dataset.updateCounter)));
   }
   async handleAction(action) {
     if (action === "daily-mode" || action === "custom-mode") { this.plugin.data.banner.mode = action === "daily-mode" ? "daily" : "custom"; await this.plugin.saveVaultData(); return this.render(); }
     if (action === "edit-banner") return new BannerModal(this.app, this.plugin, () => this.render()).open();
+    if (action === "customize-dashboard") return new DashboardLayoutModal(this.app, this.plugin, () => this.render()).open();
     if (action === "save-flash") {
       const text = this.contentEl.querySelector("[data-role=flash]").value.trim();
       const type = this.contentEl.querySelector("[data-role=flash-type]").value;
@@ -325,7 +378,12 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     this.data.banner = { ...freshData().banner, ...(this.data.banner || {}) };
     this.data.health = { ...freshData().health, ...(this.data.health || {}) };
     this.data.health.workouts = Array.isArray(this.data.health.workouts) ? this.data.health.workouts : [];
-    this.data.version = 3;
+    this.data.dashboard = { ...defaultDashboard(), ...(this.data.dashboard || {}) };
+    this.data.dashboard.order = Array.isArray(this.data.dashboard.order) ? this.data.dashboard.order : [...DEFAULT_WIDGETS];
+    this.data.dashboard.hidden = Array.isArray(this.data.dashboard.hidden) ? this.data.dashboard.hidden : [];
+    this.data.dashboard.customWidgets = Array.isArray(this.data.dashboard.customWidgets) ? this.data.dashboard.customWidgets : [];
+    for (const id of DEFAULT_WIDGETS) if (!this.data.dashboard.order.includes(id)) this.data.dashboard.order.push(id);
+    this.data.version = 4;
   }
   async saveVaultData() {
     const text = JSON.stringify(this.data, null, 2);
@@ -357,6 +415,55 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
       const key = todayKey();
       if (!this.data.days[key]) this.data.days[key] = { tasks: defaultTasks(this.getGrowthState().phase.name).map(value => ({ text: value, done: false })), flashes: [] };
       await this.saveFlash(text, "闪念"); new Notice("闪念已保存"); await this.refreshViews();
+    }).open();
+  }
+  getDashboard() { return this.data.dashboard || defaultDashboard(); }
+  async setWidgetVisibility(id, visible) {
+    const dashboard = this.getDashboard();
+    dashboard.hidden = visible ? dashboard.hidden.filter(item => item !== id) : [...new Set([...dashboard.hidden, id])];
+    await this.saveVaultData(); await this.refreshViews();
+  }
+  async moveWidget(id, direction) {
+    const order = this.getDashboard().order, current = order.indexOf(id), target = current + direction;
+    if (current < 0 || target < 0 || target >= order.length) return;
+    [order[current], order[target]] = [order[target], order[current]];
+    await this.saveVaultData(); await this.refreshViews();
+  }
+  async addCustomWidget(widget) {
+    const dashboard = this.getDashboard();
+    const id = `custom-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
+    dashboard.customWidgets.push({ id, ...widget }); dashboard.order.push(id);
+    await this.saveVaultData(); await this.refreshViews();
+  }
+  async removeCustomWidget(id) {
+    const dashboard = this.getDashboard();
+    dashboard.customWidgets = dashboard.customWidgets.filter(widget => widget.id !== id);
+    dashboard.order = dashboard.order.filter(item => item !== id);
+    dashboard.hidden = dashboard.hidden.filter(item => item !== id);
+    await this.saveVaultData(); await this.refreshViews();
+  }
+  renderCustomWidgets() {
+    const dashboard = this.getDashboard();
+    return dashboard.customWidgets.map(widget => {
+      const title = escapeHtml(widget.title), content = escapeHtml(widget.content);
+      let body = `<p>${content || "还没有内容。"}</p>`;
+      if (widget.type === "link") body = `<button class="lp-custom-link" data-open-widget-link="${escapeHtml(widget.content)}">打开链接 ↗</button>`;
+      if (widget.type === "counter") body = `<div class="lp-custom-counter"><b>${Number(widget.value) || 0}${widget.goal ? ` <small>/ ${Number(widget.goal)}</small>` : ""}</b><span>${content || "当前进度"}</span><button data-update-counter="${widget.id}">更新数值</button></div>`;
+      return `<section class="lp-card lp-custom-card" data-widget="${widget.id}"><div class="lp-heading"><span>${title}</span><button class="lp-icon-button" data-delete-widget="${widget.id}" aria-label="移除卡片">×</button></div>${body}</section>`;
+    }).join("");
+  }
+  applyDashboardLayout(root) {
+    const dashboard = this.getDashboard();
+    root.querySelectorAll("[data-widget]").forEach(element => {
+      const id = element.dataset.widget, index = dashboard.order.indexOf(id);
+      if (dashboard.hidden.includes(id) || index < 0) element.remove();
+      else element.style.order = String(index);
+    });
+  }
+  updateCustomCounter(id) {
+    const widget = this.getDashboard().customWidgets.find(item => item.id === id); if (!widget) return;
+    return new TextInputModal(this.app, `更新「${widget.title}」`, "输入当前数值", String(widget.value || 0), async value => {
+      widget.value = Math.max(0, Number(value) || 0); await this.saveVaultData(); await this.refreshViews();
     }).open();
   }
   healthStats() {
