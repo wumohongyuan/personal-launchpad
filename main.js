@@ -14,9 +14,9 @@ const DAILY_MESSAGES = [
 ];
 
 const GROWTH_PHASES = [
-  { id: "foundation", name: "地基期", from: 1, to: 8, goal: "建立时间、能量和信息筛选习惯", tasks: ["记录时间或开销", "完成 30 分钟深度阅读", "照顾身体与能量", "完成一次外部接触"] },
-  { id: "engine", name: "引擎期", from: 9, to: 16, goal: "在真实事件中训练复盘和意志力", tasks: ["完成睡前三问复盘", "做一件不想做但应该做的事", "记录一个真实事件", "完成复利领域投入"] },
-  { id: "leverage", name: "杠杆期", from: 17, to: 24, goal: "选择主线，持续输出并获得可量化反馈", tasks: ["投入当前主线至少 1 小时", "完成一次对外输出或接触", "记录一个可复用的资产", "确认今天的关键指标"] }
+  { id: "foundation", name: "地基期", from: 1, to: 8, goal: "建立时间、能量和信息筛选习惯", healthFocus: "规律优先：每周完成 3 次轻量训练，并观察睡眠与精力。", tasks: ["记录时间或开销", "完成 30 分钟深度阅读", "照顾身体与能量", "完成一次外部接触"] },
+  { id: "engine", name: "引擎期", from: 9, to: 16, goal: "在真实事件中训练复盘和意志力", healthFocus: "稳定训练结构：记录强度与时长，避免靠意志力硬撑。", tasks: ["完成睡前三问复盘", "做一件不想做但应该做的事", "记录一个真实事件", "完成复利领域投入"] },
+  { id: "leverage", name: "杠杆期", from: 17, to: 24, goal: "选择主线，持续输出并获得可量化反馈", healthFocus: "数据化积累：追踪体重、力量或配速的一项长期指标。", tasks: ["投入当前主线至少 1 小时", "完成一次对外输出或接触", "记录一个可复用的资产", "确认今天的关键指标"] }
 ];
 
 const MILESTONES = [
@@ -39,7 +39,7 @@ function escapeHtml(text) {
 function defaultTasks(stage) { return (GROWTH_PHASES.find(phase => phase.name === stage) || GROWTH_PHASES[0]).tasks; }
 function freshData() {
   return {
-    version: 1,
+    version: 3,
     banner: { mode: "daily", customText: "今天也要向前一点点。", customSource: "给未来的自己", image: "" },
     growth: { startDate: todayKey(), stage: "地基期", week: 1, goal: "建立时间、能量和信息筛选习惯", externalFeedback: [], completedMilestones: [] },
     shortcuts: [
@@ -52,6 +52,7 @@ function freshData() {
       { label: "搜索笔记", icon: "⌕", action: "search" }
     ],
     books: [],
+    health: { weeklyGoal: 3, workouts: [] },
     days: {}
   };
 }
@@ -125,6 +126,26 @@ class BookModal extends Modal {
   }
 }
 
+class WorkoutModal extends Modal {
+  constructor(app, onSubmit) { super(app); this.onSubmit = onSubmit; }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.createEl("h2", { text: "记录训练" });
+    let type = "力量训练", duration = "", intensity = "中等", weight = "", note = "";
+    new Setting(contentEl).setName("训练类型").addDropdown(dropdown => dropdown
+      .addOptions({ "力量训练": "力量训练", "跑步": "跑步", "球类": "球类", "骑行": "骑行", "游泳": "游泳", "拉伸 / 恢复": "拉伸 / 恢复", "其他": "其他" })
+      .setValue(type).onChange(value => type = value));
+    new Setting(contentEl).setName("训练时长").setDesc("分钟，可留空").addText(input => input.setPlaceholder("例如：45").onChange(value => duration = value));
+    new Setting(contentEl).setName("主观强度").addDropdown(dropdown => dropdown
+      .addOptions({ "轻松": "轻松", "中等": "中等", "高强度": "高强度" }).setValue(intensity).onChange(value => intensity = value));
+    new Setting(contentEl).setName("体重").setDesc("kg，可留空；用于长期趋势记录").addText(input => input.setPlaceholder("例如：68.5").onChange(value => weight = value));
+    new Setting(contentEl).setName("备注").setDesc("如动作、距离、配速或身体感受").addTextArea(input => input.setPlaceholder("例如：深蹲 3 组；膝盖无不适").onChange(value => note = value));
+    new Setting(contentEl).addButton(button => button.setButtonText("保存训练").setCta().onClick(async () => {
+      await this.onSubmit({ type, duration: Math.max(0, Number(duration) || 0), intensity, weight: Math.max(0, Number(weight) || 0), note: note.trim() }); this.close();
+    }));
+  }
+}
+
 class LaunchpadView extends ItemView {
   constructor(leaf, plugin) { super(leaf); this.plugin = plugin; }
   getViewType() { return VIEW_TYPE; }
@@ -151,7 +172,7 @@ class LaunchpadView extends ItemView {
   async render() {
     const root = this.contentEl;
     root.empty(); root.addClass("personal-launchpad");
-    const data = this.plugin.data, day = this.day(), books = data.books || [], growthState = this.plugin.getGrowthState(), weekly = this.plugin.weeklyStats();
+    const data = this.plugin.data, day = this.day(), books = data.books || [], growthState = this.plugin.getGrowthState(), weekly = this.plugin.weeklyStats(), health = this.plugin.healthStats();
     const reading = books.filter(book => book.status === "在读");
     const custom = data.banner.mode === "custom";
     const message = custom ? { text: data.banner.customText, source: data.banner.customSource } : this.message();
@@ -189,6 +210,13 @@ class LaunchpadView extends ItemView {
           <div class="lp-phase-progress"><i style="width:${growthState.phasePercent}%"></i></div>
           <small>本阶段第 ${growthState.phaseWeek} / ${growthState.phase.to - growthState.phase.from + 1} 周</small>
           <div class="lp-feedback"><span>本周外部反馈</span><b>${this.plugin.weekFeedbackCount()} / 1</b><button data-action="feedback">记录</button></div>
+        </section>
+        <section class="lp-card lp-health-card">
+          <div class="lp-heading"><span>◉ 身体系统</span><button data-action="workout" class="lp-icon-button">＋ 记录训练</button></div>
+          <strong>${health.today.length ? `今天已训练 ${health.today.length} 次` : "今天还没有训练记录"}</strong>
+          <p>${escapeHtml(growthState.phase.healthFocus)}</p>
+          <div class="lp-health-kpis"><span><b>${health.sessions}</b><small>本周训练 / ${health.goal}</small></span><span><b>${health.minutes}</b><small>训练分钟</small></span><span><b>${health.latestWeight ? `${health.latestWeight}kg` : "—"}</b><small>最近体重</small></span></div>
+          <div class="lp-inline-actions"><button data-action="workout" class="lp-text-button">${health.today.length ? "补充训练" : "记录今天训练"}</button><button data-action="open-health" class="lp-text-button">查看记录</button></div>
         </section>
         <section class="lp-card lp-milestone-card">
           <div class="lp-heading"><span>◈ 下一交付物</span><small>第 ${growthState.milestone.week} 周</small></div>
@@ -259,6 +287,8 @@ class LaunchpadView extends ItemView {
       }).open();
     }
     if (action === "feedback") return this.plugin.recordFeedback();
+    if (action === "workout") return this.plugin.recordWorkout();
+    if (action === "open-health") return this.plugin.openOrCreate(`个人成长系统/健身/${todayKey()}.md`, `# ${todayKey()} 健身记录\n`);
     if (action === "edit-growth") return this.plugin.editGrowth();
     if (action === "open-flashes") return this.plugin.openOrCreate(`个人成长系统/闪念/${todayKey()}.md`, `# ${todayKey()} 闪念\n`);
     if (action === "add-book") return this.plugin.addBook();
@@ -275,6 +305,7 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     this.addRibbonIcon("layout-dashboard", "打开个人启动台", () => this.activateView());
     this.addCommand({ id: "open-personal-launchpad", name: "Open personal launchpad", callback: () => this.activateView() });
     this.addCommand({ id: "quick-capture", name: "Quick capture a flash", callback: () => this.openQuickCapture() });
+    this.addCommand({ id: "quick-log-workout", name: "Quick log a workout", callback: () => this.recordWorkout() });
   }
   async onunload() { this.app.workspace.detachLeavesOfType(VIEW_TYPE); }
   async ensureFolder(path) {
@@ -292,6 +323,9 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     this.data.days = this.data.days || {};
     this.data.growth = { ...freshData().growth, ...(this.data.growth || {}) };
     this.data.banner = { ...freshData().banner, ...(this.data.banner || {}) };
+    this.data.health = { ...freshData().health, ...(this.data.health || {}) };
+    this.data.health.workouts = Array.isArray(this.data.health.workouts) ? this.data.health.workouts : [];
+    this.data.version = 3;
   }
   async saveVaultData() {
     const text = JSON.stringify(this.data, null, 2);
@@ -323,6 +357,27 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
       const key = todayKey();
       if (!this.data.days[key]) this.data.days[key] = { tasks: defaultTasks(this.getGrowthState().phase.name).map(value => ({ text: value, done: false })), flashes: [] };
       await this.saveFlash(text, "闪念"); new Notice("闪念已保存"); await this.refreshViews();
+    }).open();
+  }
+  healthStats() {
+    const workouts = this.data.health.workouts || [];
+    const begin = window.moment().startOf("isoWeek"), end = window.moment().endOf("isoWeek");
+    const week = workouts.filter(item => window.moment(item.date, "YYYY-MM-DD", true).isBetween(begin, end, "day", "[]"));
+    const today = workouts.filter(item => item.date === todayKey());
+    const latestWithWeight = [...workouts].reverse().find(item => item.weight > 0);
+    return { goal: this.data.health.weeklyGoal || 3, sessions: week.length, minutes: week.reduce((total, item) => total + (Number(item.duration) || 0), 0), today, latestWeight: latestWithWeight?.weight || 0 };
+  }
+  recordWorkout() {
+    return new WorkoutModal(this.app, async workout => {
+      const entry = { ...workout, date: todayKey(), time: window.moment().format("HH:mm") };
+      this.data.health.workouts.push(entry);
+      await this.ensureFolder("个人成长系统/健身");
+      const path = `个人成长系统/健身/${todayKey()}.md`;
+      const details = [`- 类型：${entry.type}`, `- 时长：${entry.duration ? `${entry.duration} 分钟` : "未记录"}`, `- 强度：${entry.intensity}`, entry.weight ? `- 体重：${entry.weight} kg` : "", entry.note ? `- 备注：${entry.note}` : ""].filter(Boolean).join("\n");
+      const block = `\n## ${entry.time} · ${entry.type}\n\n${details}\n`;
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (file instanceof TFile) await this.app.vault.append(file, block); else await this.app.vault.create(path, `# ${todayKey()} 健身记录\n${block}`);
+      await this.saveVaultData(); new Notice("训练已记录"); await this.refreshViews();
     }).open();
   }
   weekFeedbackCount() {
