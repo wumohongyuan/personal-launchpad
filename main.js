@@ -109,6 +109,22 @@ class TextInputModal extends Modal {
   }
 }
 
+class BookModal extends Modal {
+  constructor(app, onSubmit) { super(app); this.onSubmit = onSubmit; }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.createEl("h2", { text: "添加到书库" });
+    let title = "", author = "", total = "";
+    new Setting(contentEl).setName("书名").addText(input => input.setPlaceholder("例如：认知觉醒").onChange(value => title = value));
+    new Setting(contentEl).setName("作者").setDesc("可留空").addText(input => input.setPlaceholder("作者姓名").onChange(value => author = value));
+    new Setting(contentEl).setName("总页数").setDesc("不知道可留空").addText(input => input.setPlaceholder("例如：320").onChange(value => total = value));
+    new Setting(contentEl).addButton(button => button.setButtonText("加入书库").setCta().onClick(async () => {
+      if (!title.trim()) return new Notice("请先填写书名。");
+      await this.onSubmit({ title: title.trim(), author: author.trim(), total: Math.max(0, Number(total) || 0) }); this.close();
+    }));
+  }
+}
+
 class LaunchpadView extends ItemView {
   constructor(leaf, plugin) { super(leaf); this.plugin = plugin; }
   getViewType() { return VIEW_TYPE; }
@@ -144,9 +160,10 @@ class LaunchpadView extends ItemView {
     const dateLabel = window.moment().format("YYYY 年 M 月 D 日 · dddd");
     root.innerHTML = `
       <section class="lp-banner" style="${background}">
-        <div class="lp-banner-meta"><span>${dateLabel}</span><span>第 ${data.growth.week} 周 · ${escapeHtml(data.growth.stage)}</span></div>
+        <div class="lp-banner-meta"><span>${dateLabel}</span><span>第 ${growthState.week} 周 · ${escapeHtml(growthState.phase.name)}</span></div>
         <blockquote>${escapeHtml(message.text)}</blockquote>
         <div class="lp-source">— ${escapeHtml(message.source || "每日推送")}</div>
+        <div class="lp-plan-progress" aria-label="180 天计划进度"><i style="width:${growthState.planPercent}%"></i><span>180 天计划 · 第 ${growthState.day} 天 · ${growthState.planPercent}%</span></div>
         <div class="lp-banner-actions"><button data-action="daily-mode" class="${!custom ? "is-active" : ""}">每日推送</button><button data-action="custom-mode" class="${custom ? "is-active" : ""}">自定义</button><button data-action="edit-banner" aria-label="编辑横幅">⚙</button></div>
       </section>
       <main class="lp-grid">
@@ -162,7 +179,7 @@ class LaunchpadView extends ItemView {
         <section class="lp-card lp-tasks-card">
           <div class="lp-heading"><span>✓ 今日行动</span><small>${done} / ${day.tasks.length}</small></div>
           <div class="lp-progress"><i style="width:${day.tasks.length ? Math.round(done / day.tasks.length * 100) : 0}%"></i></div>
-          <div class="lp-task-list">${day.tasks.map((task, index) => `<div class="lp-task ${task.done ? "is-done" : ""}"><label><input type="checkbox" data-task="${index}" ${task.done ? "checked" : ""}><span>${escapeHtml(task.text)}</span></label><button data-delete-task="${index}" aria-label="删除任务">×</button></div>`).join("")}</div>
+          <div class="lp-task-list">${day.tasks.map((task, index) => `<div class="lp-task ${task.done ? "is-done" : ""}"><label><input type="checkbox" data-task="${index}" ${task.done ? "checked" : ""}><span>${escapeHtml(task.text)}</span></label><span class="lp-task-actions"><button data-edit-task="${index}" aria-label="编辑任务">✎</button><button data-delete-task="${index}" aria-label="删除任务">×</button></span></div>`).join("")}</div>
           <button data-action="add-task" class="lp-text-button">＋ 添加临时任务</button>
         </section>
         <section class="lp-card lp-growth-card">
@@ -197,7 +214,7 @@ class LaunchpadView extends ItemView {
         </section>
         <section class="lp-card lp-recent-card">
           <div class="lp-heading"><span>◷ 今日闪念</span><button data-action="open-flashes" class="lp-icon-button">查看全部</button></div>
-          <div class="lp-recent-list">${day.flashes.length ? day.flashes.slice(-4).reverse().map(f => `<div><b>${escapeHtml(f.type)}</b><span>${escapeHtml(f.text)}</span></div>`).join("") : "<p>还没有记录。第一条闪念从这里开始。</p>"}</div>
+          <div class="lp-recent-list">${day.flashes.length ? day.flashes.slice(-4).reverse().map((f, reverseIndex) => { const index = day.flashes.length - 1 - reverseIndex; return `<div><b>${escapeHtml(f.type)}</b><span>${escapeHtml(f.text)}</span>${f.type === "待办" ? `<button data-flash-to-task="${index}">加入行动</button>` : ""}</div>`; }).join("") : "<p>还没有记录。第一条闪念从这里开始。</p>"}</div>
         </section>
       </main>`;
     this.bindEvents();
@@ -208,6 +225,15 @@ class LaunchpadView extends ItemView {
     }));
     this.contentEl.querySelectorAll("[data-delete-task]").forEach(button => button.addEventListener("click", async () => {
       this.day().tasks.splice(Number(button.dataset.deleteTask), 1); await this.plugin.saveVaultData(); await this.render();
+    }));
+    this.contentEl.querySelectorAll("[data-edit-task]").forEach(button => button.addEventListener("click", () => {
+      const index = Number(button.dataset.editTask), task = this.day().tasks[index];
+      new TextInputModal(this.app, "编辑任务", "任务内容", task.text, async text => { task.text = text; await this.plugin.saveVaultData(); await this.render(); }).open();
+    }));
+    this.contentEl.querySelectorAll("[data-flash-to-task]").forEach(button => button.addEventListener("click", async () => {
+      const flash = this.day().flashes[Number(button.dataset.flashToTask)]; if (!flash) return;
+      this.day().tasks.push({ text: flash.text, done: false }); flash.type = "待办（已加入行动）";
+      await this.plugin.saveVaultData(); new Notice("已加入今日行动"); await this.render();
     }));
     this.contentEl.querySelectorAll("[data-action]").forEach(button => button.addEventListener("click", () => this.handleAction(button.dataset.action)));
     this.contentEl.querySelectorAll("[data-shortcut]").forEach(button => button.addEventListener("click", () => this.plugin.runShortcut(this.plugin.data.shortcuts[Number(button.dataset.shortcut)])));
@@ -223,9 +249,9 @@ class LaunchpadView extends ItemView {
       await this.plugin.saveFlash(text, type); new Notice("闪念已保存"); return this.render();
     }
     if (action === "edit-focus") {
-      const focus = window.prompt("今天最重要的一件事：", this.day().focus || "");
-      if (focus !== null) { this.day().focus = focus.trim(); await this.plugin.saveVaultData(); await this.render(); }
-      return;
+      return new TextInputModal(this.app, "今天最重要的一件事", "例如：完成项目方案第一版", this.day().focus || "", async text => {
+        this.day().focus = text; await this.plugin.saveVaultData(); await this.render();
+      }).open();
     }
     if (action === "add-task") {
       return new TextInputModal(this.app, "添加临时任务", "例如：给客户回消息", "", async text => {
@@ -248,7 +274,7 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     this.registerView(VIEW_TYPE, leaf => new LaunchpadView(leaf, this));
     this.addRibbonIcon("layout-dashboard", "打开个人启动台", () => this.activateView());
     this.addCommand({ id: "open-personal-launchpad", name: "Open personal launchpad", callback: () => this.activateView() });
-    this.addCommand({ id: "quick-capture", name: "Quick capture a flash", callback: () => this.activateView() });
+    this.addCommand({ id: "quick-capture", name: "Quick capture a flash", callback: () => this.openQuickCapture() });
   }
   async onunload() { this.app.workspace.detachLeavesOfType(VIEW_TYPE); }
   async ensureFolder(path) {
@@ -292,6 +318,13 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     if (file instanceof TFile) await this.app.vault.append(file, block); else await this.app.vault.create(path, `# ${key} 闪念\n${block}`);
     await this.saveVaultData();
   }
+  openQuickCapture() {
+    return new TextInputModal(this.app, "闪念速记", "想到什么就先写下来", "", async text => {
+      const key = todayKey();
+      if (!this.data.days[key]) this.data.days[key] = { tasks: defaultTasks(this.getGrowthState().phase.name).map(value => ({ text: value, done: false })), flashes: [] };
+      await this.saveFlash(text, "闪念"); new Notice("闪念已保存"); await this.refreshViews();
+    }).open();
+  }
   weekFeedbackCount() {
     const start = window.moment().startOf("isoWeek"); return (this.data.growth.externalFeedback || []).filter(item => window.moment(item.date).isSameOrAfter(start, "day")).length;
   }
@@ -300,6 +333,7 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     const start = window.moment(growth.startDate, "YYYY-MM-DD", true);
     const days = start.isValid() ? Math.max(0, window.moment().startOf("day").diff(start.startOf("day"), "days")) : 0;
     const week = Math.min(24, Math.floor(days / 7) + 1);
+    const day = Math.min(180, days + 1);
     const phase = GROWTH_PHASES.find(item => week >= item.from && week <= item.to) || GROWTH_PHASES[GROWTH_PHASES.length - 1];
     const phaseWeek = week - phase.from + 1;
     const milestone = MILESTONES.find(item => !(growth.completedMilestones || []).includes(item.id)) || MILESTONES[MILESTONES.length - 1];
@@ -308,7 +342,7 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     let alert = { level: "ok", message: "外部反馈正常推进中。" };
     if (previousWeeks.slice(0, 4).every(count => count === 0) && thisWeek === 0) alert = { level: "danger", message: "红灯：连续四周没有外部反馈，先完成一次真实接触。" };
     else if (previousWeeks.slice(0, 2).every(count => count === 0) && thisWeek === 0) alert = { level: "warn", message: "黄灯：连续两周没有外部反馈，本周优先完成一次接触。" };
-    return { week, phase, phaseWeek, phasePercent: Math.round(phaseWeek / (phase.to - phase.from + 1) * 100), milestone, milestoneDone: (growth.completedMilestones || []).includes(milestone.id), alert };
+    return { week, day, planPercent: Math.round(day / 180 * 100), phase, phaseWeek, phasePercent: Math.round(phaseWeek / (phase.to - phase.from + 1) * 100), milestone, milestoneDone: (growth.completedMilestones || []).includes(milestone.id), alert };
   }
   async toggleCurrentMilestone() {
     const state = this.getGrowthState(), completed = this.data.growth.completedMilestones || [];
@@ -338,38 +372,36 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     return this.openOrCreate(`个人成长系统/复盘/第${state.week}周复盘.md`, content);
   }
   async recordFeedback() {
-    const content = window.prompt("记录这次外部接触或反馈：");
-    if (!content?.trim()) return;
-    const entry = { date: todayKey(), text: content.trim() }; this.data.growth.externalFeedback.push(entry);
-    await this.ensureFolder("个人成长系统/外部反馈");
-    const path = `个人成长系统/外部反馈/${todayKey()}.md`, line = `- ${window.moment().format("HH:mm")} ${entry.text}\n`;
-    const file = this.app.vault.getAbstractFileByPath(path);
-    if (file instanceof TFile) await this.app.vault.append(file, line); else await this.app.vault.create(path, `# ${todayKey()} 外部反馈\n\n${line}`);
-    await this.saveVaultData(); new Notice("外部反馈已记录"); await this.activateView();
+    return new TextInputModal(this.app, "记录外部反馈", "对象、发生了什么、你得到什么反馈", "", async text => {
+      const entry = { date: todayKey(), text }; this.data.growth.externalFeedback.push(entry);
+      await this.ensureFolder("个人成长系统/外部反馈");
+      const path = `个人成长系统/外部反馈/${todayKey()}.md`, line = `- ${window.moment().format("HH:mm")} ${entry.text}\n`;
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (file instanceof TFile) await this.app.vault.append(file, line); else await this.app.vault.create(path, `# ${todayKey()} 外部反馈\n\n${line}`);
+      await this.saveVaultData(); new Notice("外部反馈已记录"); await this.refreshViews();
+    }).open();
   }
   async editGrowth() {
     return new GrowthSettingsModal(this.app, this, () => this.refreshViews()).open();
   }
   async addBook() {
-    const title = window.prompt("书名：");
-    if (!title?.trim()) return;
-    const author = window.prompt("作者（可留空）：") || "";
-    const total = Number(window.prompt("总页数（不知道可留空）：") || 0);
-    const book = { title: title.trim(), author: author.trim(), total, current: 0, status: "在读", addedAt: todayKey() };
-    this.data.books.push(book);
-    await this.ensureFolder("个人成长系统/书库");
-    const safeName = book.title.replace(/[\\/:*?\"<>|]/g, "-");
-    await this.openOrCreate(`个人成长系统/书库/${safeName}.md`, `# ${book.title}\n\n- 作者：${book.author}\n- 状态：在读\n- 阅读进度：0${book.total ? ` / ${book.total}` : ""}\n\n## 摘录与感受\n`);
-    await this.saveVaultData(); new Notice("已加入书库"); await this.refreshViews();
+    return new BookModal(this.app, async ({ title, author, total }) => {
+      const book = { title, author, total, current: 0, status: "在读", addedAt: todayKey() };
+      this.data.books.push(book);
+      await this.ensureFolder("个人成长系统/书库");
+      const safeName = book.title.replace(/[\\/:*?\"<>|]/g, "-");
+      await this.openOrCreate(`个人成长系统/书库/${safeName}.md`, `# ${book.title}\n\n- 作者：${book.author}\n- 状态：在读\n- 阅读进度：0${book.total ? ` / ${book.total}` : ""}\n\n## 摘录与感受\n`);
+      await this.saveVaultData(); new Notice("已加入书库"); await this.refreshViews();
+    }).open();
   }
   async updateBook(index) {
     const book = this.data.books[index]; if (!book) return;
-    const current = window.prompt(`《${book.title}》当前读到第几页？`, String(book.current || 0));
-    if (current === null) return;
-    book.current = Math.max(0, Number(current) || 0);
-    if (book.total && book.current >= book.total) book.status = "已读";
-    await this.saveVaultData(); await this.refreshViews();
-    new Notice(book.status === "已读" ? "恭喜读完这本书。" : "阅读进度已更新");
+    return new TextInputModal(this.app, `《${book.title}》阅读进度`, "当前读到第几页", String(book.current || 0), async value => {
+      book.current = Math.max(0, Number(value) || 0);
+      if (book.total && book.current >= book.total) book.status = "已读";
+      await this.saveVaultData(); await this.refreshViews();
+      new Notice(book.status === "已读" ? "恭喜读完这本书。" : "阅读进度已更新");
+    }).open();
   }
   async refreshViews() {
     for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE)) if (leaf.view instanceof LaunchpadView) await leaf.view.render();
