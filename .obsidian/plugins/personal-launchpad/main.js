@@ -21,16 +21,16 @@ const GROWTH_PHASES = [
 ];
 
 const MILESTONES = [
-  { id: "week-1", week: 1, title: "流水账与第一次外部接触" },
-  { id: "week-2", week: 2, title: "第一份 AI 周核算报表" },
-  { id: "week-4", week: 4, title: "精力曲线原始数据与 3 次外部接触" },
-  { id: "week-8", week: 8, title: "地基三件套运行月报" },
-  { id: "week-10", week: 10, title: "第一份 AI 周复盘报告" },
-  { id: "week-12", week: 12, title: "第一次准交易记录" },
-  { id: "week-16", week: 16, title: "三棱镜分析与引擎双月报" },
-  { id: "week-17", week: 17, title: "选定主线与第一个月目标" },
-  { id: "week-18", week: 18, title: "徙木立信执行第一天" },
-  { id: "week-24", week: 24, title: "180 天系统首考报告" }
+  { id: "week-1", week: 1, title: "流水账与第一次外部接触", template: "## 本周流水账\n\n## 第一次外部接触\n- 对象：\n- 我做了什么：\n- 获得的反馈：\n- 下一步：" },
+  { id: "week-2", week: 2, title: "第一份 AI 周核算报表", template: "## 时间、金钱、精力核算\n\n## 三个观察\n1. \n2. \n3. \n\n## 下周调整" },
+  { id: "week-4", week: 4, title: "精力曲线原始数据与 3 次外部接触", template: "## 精力曲线\n\n## 外部反馈记录\n\n## 规律与调整" },
+  { id: "week-8", week: 8, title: "地基三件套运行月报", template: "## 时间 / 能量 / 信息筛选\n\n## 做得最好的事\n\n## 最大阻力\n\n## 下一阶段建议" },
+  { id: "week-10", week: 10, title: "第一份 AI 周复盘报告", template: "## 成功动作\n\n## 失败动作\n\n## 一条核心规律\n\n## 下周实验" },
+  { id: "week-12", week: 12, title: "第一次准交易记录", template: "## 对象与场景\n\n## 提供的价值\n\n## 对方反馈 / 交换\n\n## 下次改进" },
+  { id: "week-16", week: 16, title: "三棱镜分析与引擎双月报", template: "## 心理学层\n\n## 控制与博弈层\n\n## 领导力层\n\n## 我的行动" },
+  { id: "week-17", week: 17, title: "选定主线与第一个月目标", template: "## 我选择的主线\n\n## 为什么是它\n\n## 第一个月目标\n\n## 不做什么" },
+  { id: "week-18", week: 18, title: "徙木立信执行第一天", template: "## 公开承诺\n\n## 第一天动作\n\n## 链接 / 截图说明\n\n## 明日行动" },
+  { id: "week-24", week: 24, title: "180 天系统首考报告", template: "## 外部反馈次数\n\n## 能力变化\n\n## 继续 / 切换的决定\n\n## 下一阶段" }
 ];
 
 function todayKey() { return window.moment().format("YYYY-MM-DD"); }
@@ -76,6 +76,26 @@ class BannerModal extends Modal {
   }
 }
 
+class GrowthSettingsModal extends Modal {
+  constructor(app, plugin, onSave) { super(app); this.plugin = plugin; this.onSave = onSave; }
+  onOpen() {
+    const { contentEl } = this, growth = this.plugin.data.growth;
+    contentEl.createEl("h2", { text: "成长系统设置" });
+    let startDate = growth.startDate || todayKey();
+    new Setting(contentEl)
+      .setName("计划开始日期")
+      .setDesc("插件根据该日期自动计算当前周数和阶段。")
+      .addText(input => input.setValue(startDate).setPlaceholder("YYYY-MM-DD").onChange(value => startDate = value.trim()));
+    new Setting(contentEl)
+      .setName("阶段规则")
+      .setDesc("第 1–8 周为地基期，第 9–16 周为引擎期，第 17–24 周为杠杆期。")
+      .addButton(button => button.setButtonText("保存设置").setCta().onClick(async () => {
+        if (!window.moment(startDate, "YYYY-MM-DD", true).isValid()) return new Notice("日期格式应为 YYYY-MM-DD");
+        growth.startDate = startDate; await this.plugin.saveVaultData(); await this.plugin.refreshViews(); this.onSave(); this.close();
+      }));
+  }
+}
+
 class LaunchpadView extends ItemView {
   constructor(leaf, plugin) { super(leaf); this.plugin = plugin; }
   getViewType() { return VIEW_TYPE; }
@@ -102,7 +122,7 @@ class LaunchpadView extends ItemView {
   async render() {
     const root = this.contentEl;
     root.empty(); root.addClass("personal-launchpad");
-    const data = this.plugin.data, day = this.day(), books = data.books || [], growthState = this.plugin.getGrowthState();
+    const data = this.plugin.data, day = this.day(), books = data.books || [], growthState = this.plugin.getGrowthState(), weekly = this.plugin.weeklyStats();
     const reading = books.filter(book => book.status === "在读");
     const custom = data.banner.mode === "custom";
     const message = custom ? { text: data.banner.customText, source: data.banner.customSource } : this.message();
@@ -144,7 +164,12 @@ class LaunchpadView extends ItemView {
           <div class="lp-heading"><span>◈ 下一交付物</span><small>第 ${growthState.milestone.week} 周</small></div>
           <strong>${escapeHtml(growthState.milestone.title)}</strong>
           <p class="lp-alert ${growthState.alert.level}">${escapeHtml(growthState.alert.message)}</p>
-          <button data-action="complete-milestone" class="lp-text-button">${growthState.milestoneDone ? "✓ 已完成" : "标记为完成"}</button>
+          <div class="lp-inline-actions"><button data-action="milestone-template" class="lp-text-button">打开模板</button><button data-action="complete-milestone" class="lp-text-button">${growthState.milestoneDone ? "✓ 已完成" : "标记为完成"}</button></div>
+        </section>
+        <section class="lp-card lp-week-card">
+          <div class="lp-heading"><span>◒ 本周复盘</span><small>${weekly.completed} / ${weekly.total} 项完成</small></div>
+          <div class="lp-week-kpis"><span><b>${weekly.rate}%</b><small>行动完成率</small></span><span><b>${weekly.feedback}</b><small>外部反馈</small></span><span><b>${weekly.flashes}</b><small>闪念捕捉</small></span></div>
+          <button data-action="weekly-review" class="lp-primary">打开本周复盘</button>
         </section>
         <section class="lp-card lp-shortcuts-card">
           <div class="lp-heading"><span>⚡ 快捷入口</span></div>
@@ -196,6 +221,8 @@ class LaunchpadView extends ItemView {
     if (action === "open-flashes") return this.plugin.openOrCreate(`个人成长系统/闪念/${todayKey()}.md`, `# ${todayKey()} 闪念\n`);
     if (action === "add-book") return this.plugin.addBook();
     if (action === "complete-milestone") return this.plugin.toggleCurrentMilestone();
+    if (action === "milestone-template") return this.plugin.openCurrentMilestone();
+    if (action === "weekly-review") return this.plugin.openWeeklyReview();
   }
 }
 
@@ -273,6 +300,27 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     await this.saveVaultData(); await this.refreshViews();
     new Notice(completed.includes(state.milestone.id) ? "已取消交付物完成状态" : "交付物已标记完成");
   }
+  weeklyStats() {
+    const begin = window.moment().startOf("isoWeek"), end = window.moment().endOf("isoWeek");
+    let total = 0, completed = 0, flashes = 0;
+    for (const [date, day] of Object.entries(this.data.days || {})) {
+      if (!window.moment(date, "YYYY-MM-DD", true).isBetween(begin, end, "day", "[]")) continue;
+      total += (day.tasks || []).length;
+      completed += (day.tasks || []).filter(task => task.done).length;
+      flashes += (day.flashes || []).length;
+    }
+    return { total, completed, flashes, feedback: this.weekFeedbackCount(), rate: total ? Math.round(completed / total * 100) : 0 };
+  }
+  async openCurrentMilestone() {
+    const milestone = this.getGrowthState().milestone;
+    const safeTitle = milestone.title.replace(/[\\/:*?\"<>|]/g, "-");
+    return this.openOrCreate(`个人成长系统/交付物/第${milestone.week}周-${safeTitle}.md`, `# 第 ${milestone.week} 周 · ${milestone.title}\n\n状态：进行中\n\n${milestone.template}\n`);
+  }
+  async openWeeklyReview() {
+    const state = this.getGrowthState(), stats = this.weeklyStats(), start = window.moment().startOf("isoWeek").format("YYYY-MM-DD"), end = window.moment().endOf("isoWeek").format("YYYY-MM-DD");
+    const content = `# 第 ${state.week} 周复盘\n\n周期：${start} 至 ${end}\n阶段：${state.phase.name}\n\n## 本周数据\n- 行动完成率：${stats.rate}%（${stats.completed}/${stats.total}）\n- 外部反馈：${stats.feedback} 次\n- 闪念捕捉：${stats.flashes} 条\n\n## 本周做对了什么？\n\n## 哪件事如果重来，会换一种方式？\n\n## 我从现实中收到的反馈\n\n## 下周最重要的一件事\n\n## AI 周报提示词\n> 请根据以上复盘，用“回顾目标—评估结果—分析原因—提炼规律”四步法，给我 3 个成功动作、2 个失败动作和 1 条下周最值得验证的规律。\n`;
+    return this.openOrCreate(`个人成长系统/复盘/第${state.week}周复盘.md`, content);
+  }
   async recordFeedback() {
     const content = window.prompt("记录这次外部接触或反馈：");
     if (!content?.trim()) return;
@@ -284,11 +332,7 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     await this.saveVaultData(); new Notice("外部反馈已记录"); await this.activateView();
   }
   async editGrowth() {
-    const startDate = window.prompt("计划开始日期（YYYY-MM-DD）：", this.data.growth.startDate || todayKey());
-    if (startDate === null) return;
-    if (!window.moment(startDate, "YYYY-MM-DD", true).isValid()) return new Notice("日期格式应为 YYYY-MM-DD");
-    this.data.growth.startDate = startDate;
-    await this.saveVaultData(); await this.refreshViews();
+    return new GrowthSettingsModal(this.app, this, () => this.refreshViews()).open();
   }
   async addBook() {
     const title = window.prompt("书名：");

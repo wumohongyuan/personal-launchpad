@@ -13,3 +13,6 @@
 
 .lp-milestone-card { grid-column:span 5; }.lp-phase-progress { height:5px; margin:11px 0 5px; overflow:hidden; border-radius:9px; background:rgba(100,140,120,.16); }.lp-phase-progress i { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg, #b4db77, var(--lp-accent)); }.lp-growth-card > small { color:var(--lp-muted); }.lp-milestone-card > strong { display:block; min-height:44px; font-size:17px; line-height:1.45; }.lp-alert { margin:12px 0 9px; padding:8px 10px; border-radius:9px; color:#4d796b; background:rgba(101,175,145,.13); font-size:12px; line-height:1.45; }.lp-alert.warn { color:#8a6526; background:rgba(230,176,63,.16); }.lp-alert.danger { color:#a04b4b; background:rgba(214,94,94,.15); }
 @media (max-width: 800px) { .lp-milestone-card { grid-column:span 2; } }
+
+.lp-week-card { grid-column:span 7; }.lp-inline-actions { display:flex; gap:14px; }.lp-week-kpis { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin:9px 0 16px; }.lp-week-kpis span { display:grid; gap:2px; padding:10px; border-radius:10px; background:rgba(128,180,159,.10); }.lp-week-kpis b { font-size:21px; color:var(--lp-accent); }.lp-week-kpis small { color:var(--lp-muted); font-size:11px; }
+@media (max-width: 800px) { .lp-week-card { grid-column:span 2; } }
