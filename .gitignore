@@ -1,0 +1,10 @@
+# 个人成长数据只在 Fast Note Sync 中同步，不进入公开源码仓库。
+个人成长系统/
+
+# 不公开本机 Obsidian 界面和工作区状态。
+.obsidian/app.json
+.obsidian/appearance.json
+.obsidian/hotkeys.json
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/community-plugins.json
