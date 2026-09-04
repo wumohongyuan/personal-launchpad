@@ -10,8 +10,7 @@ const DAILY_MESSAGES = [
   { text: "不积跬步，无以至千里。", source: "《荀子·劝学》" },
   { text: "长风破浪会有时，直挂云帆济沧海。", source: "李白《行路难》" },
   { text: "真正的进步，来自你愿意面对现实的那一刻。", source: "成长提醒" },
-  { text: "今天先完成一件小事，让行动替你说话。", source: "成长提醒" },
-  { text: "你是来挨打的，不是来证明自己聪明的。", source: "个人系统铁律" }
+  { text: "今天先完成一件小事，让行动替你说话。", source: "成长提醒" }
 ];
 
 const GROWTH_PHASES = [
@@ -96,6 +95,20 @@ class GrowthSettingsModal extends Modal {
   }
 }
 
+class TextInputModal extends Modal {
+  constructor(app, title, placeholder, initialValue, onSubmit) { super(app); this.title = title; this.placeholder = placeholder; this.initialValue = initialValue; this.onSubmit = onSubmit; }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.createEl("h2", { text: this.title });
+    const input = contentEl.createEl("input", { type: "text", value: this.initialValue || "", placeholder: this.placeholder });
+    input.addClass("lp-modal-input");
+    const save = async () => { const value = input.value.trim(); if (!value) return new Notice("请输入内容后再保存。"); await this.onSubmit(value); this.close(); };
+    input.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); save(); } });
+    new Setting(contentEl).addButton(button => button.setButtonText("保存").setCta().onClick(save));
+    window.setTimeout(() => input.focus(), 0);
+  }
+}
+
 class LaunchpadView extends ItemView {
   constructor(leaf, plugin) { super(leaf); this.plugin = plugin; }
   getViewType() { return VIEW_TYPE; }
@@ -149,7 +162,7 @@ class LaunchpadView extends ItemView {
         <section class="lp-card lp-tasks-card">
           <div class="lp-heading"><span>✓ 今日行动</span><small>${done} / ${day.tasks.length}</small></div>
           <div class="lp-progress"><i style="width:${day.tasks.length ? Math.round(done / day.tasks.length * 100) : 0}%"></i></div>
-          <div class="lp-task-list">${day.tasks.map((task, index) => `<label class="lp-task ${task.done ? "is-done" : ""}"><input type="checkbox" data-task="${index}" ${task.done ? "checked" : ""}><span>${escapeHtml(task.text)}</span></label>`).join("")}</div>
+          <div class="lp-task-list">${day.tasks.map((task, index) => `<div class="lp-task ${task.done ? "is-done" : ""}"><label><input type="checkbox" data-task="${index}" ${task.done ? "checked" : ""}><span>${escapeHtml(task.text)}</span></label><button data-delete-task="${index}" aria-label="删除任务">×</button></div>`).join("")}</div>
           <button data-action="add-task" class="lp-text-button">＋ 添加临时任务</button>
         </section>
         <section class="lp-card lp-growth-card">
@@ -193,6 +206,9 @@ class LaunchpadView extends ItemView {
     this.contentEl.querySelectorAll("[data-task]").forEach(input => input.addEventListener("change", async e => {
       this.day().tasks[Number(e.target.dataset.task)].done = e.target.checked; await this.plugin.saveVaultData(); await this.render();
     }));
+    this.contentEl.querySelectorAll("[data-delete-task]").forEach(button => button.addEventListener("click", async () => {
+      this.day().tasks.splice(Number(button.dataset.deleteTask), 1); await this.plugin.saveVaultData(); await this.render();
+    }));
     this.contentEl.querySelectorAll("[data-action]").forEach(button => button.addEventListener("click", () => this.handleAction(button.dataset.action)));
     this.contentEl.querySelectorAll("[data-shortcut]").forEach(button => button.addEventListener("click", () => this.plugin.runShortcut(this.plugin.data.shortcuts[Number(button.dataset.shortcut)])));
     this.contentEl.querySelectorAll("[data-book]").forEach(button => button.addEventListener("click", () => this.plugin.updateBook(Number(button.dataset.book))));
@@ -212,9 +228,9 @@ class LaunchpadView extends ItemView {
       return;
     }
     if (action === "add-task") {
-      const text = window.prompt("添加一项临时任务：");
-      if (text?.trim()) { this.day().tasks.push({ text: text.trim(), done: false }); await this.plugin.saveVaultData(); await this.render(); }
-      return;
+      return new TextInputModal(this.app, "添加临时任务", "例如：给客户回消息", "", async text => {
+        this.day().tasks.push({ text, done: false }); await this.plugin.saveVaultData(); await this.render();
+      }).open();
     }
     if (action === "feedback") return this.plugin.recordFeedback();
     if (action === "edit-growth") return this.plugin.editGrowth();
