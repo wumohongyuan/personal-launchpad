@@ -232,8 +232,9 @@ class LaunchpadView extends ItemView {
         <blockquote>${escapeHtml(message.text)}</blockquote>
         <div class="lp-source">— ${escapeHtml(message.source || "每日推送")}</div>
         <div class="lp-plan-progress" aria-label="180 天计划进度"><i style="width:${growthState.planPercent}%"></i><span>180 天计划 · 第 ${growthState.day} 天 · ${growthState.planPercent}%</span></div>
-        <div class="lp-banner-actions"><button data-action="daily-mode" class="${!custom ? "is-active" : ""}">每日推送</button><button data-action="custom-mode" class="${custom ? "is-active" : ""}">自定义</button><button data-action="edit-banner" aria-label="编辑横幅">⚙</button><button data-action="customize-dashboard" aria-label="定制主页">▦</button></div>
+        <div class="lp-banner-mode" aria-label="推送设置"><span>推送</span><div class="lp-mode-switch"><button data-action="daily-mode" class="${!custom ? "is-active" : ""}">每日</button><button data-action="custom-mode" class="${custom ? "is-active" : ""}">自定义</button></div><button data-action="edit-banner" class="lp-banner-edit" aria-label="编辑推送内容">编辑</button></div>
       </section>
+      <div class="lp-dashboard-toolbar"><span>今日工作台</span><button data-action="customize-dashboard">▦ 定制主页</button></div>
       <main class="lp-grid">
         <section class="lp-card lp-capture-card" data-widget="capture">
           <div class="lp-heading"><span>✦ 闪念</span><small>先捕捉，后整理</small></div>
