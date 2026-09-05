@@ -329,7 +329,7 @@ class DashboardLayoutModal extends Modal {
       if (!title) continue;
       new Setting(contentEl).setName(title).setDesc(custom ? "自定义卡片" : "系统卡片")
         .addToggle(toggle => toggle.setValue(!dashboard.hidden.includes(id)).onChange(async visible => { await this.plugin.setWidgetVisibility(id, visible); this.onSave(); }))
-        .addDropdown(dropdown => dropdown.addOptions({ auto: "默认", compact: "紧凑（4列）", standard: "标准（6列）", wide: "宽幅（8列）", full: "全宽（12列）", "span-5": "拖拽尺寸（5列）", "span-7": "拖拽尺寸（7列）", "span-9": "拖拽尺寸（9列）", "span-10": "拖拽尺寸（10列）", "span-11": "拖拽尺寸（11列）" }).setValue(this.plugin.getWidgetSize(id)).onChange(async size => { await this.plugin.setWidgetSize(id, size); this.onSave(); this.render(); }))
+        .addDropdown(dropdown => dropdown.addOptions({ auto: "默认", compact: "紧凑（4列）", standard: "标准（6列）", wide: "宽幅（8列）", full: "全宽（12列）", "span-1": "自由尺寸（1列）", "span-2": "自由尺寸（2列）", "span-3": "自由尺寸（3列）", "span-5": "自由尺寸（5列）", "span-7": "自由尺寸（7列）", "span-9": "自由尺寸（9列）", "span-10": "自由尺寸（10列）", "span-11": "自由尺寸（11列）" }).setValue(this.plugin.getWidgetSize(id)).onChange(async size => { await this.plugin.setWidgetSize(id, size); this.onSave(); this.render(); }))
         .addExtraButton(button => button.setIcon("chevron-up").setTooltip("上移").onClick(async () => { await this.plugin.moveWidget(id, -1); this.onSave(); this.render(); }))
         .addExtraButton(button => button.setIcon("chevron-down").setTooltip("下移").onClick(async () => { await this.plugin.moveWidget(id, 1); this.onSave(); this.render(); }));
       if (custom) new Setting(contentEl).setName("移除「" + title + "」").setDesc("只移除这张卡片，不影响其它笔记。")
@@ -494,7 +494,7 @@ class LaunchpadView extends ItemView {
       let width = start.w, height = start.h;
       card.classList.add("is-resizing");
       const move = pointerEvent => {
-        width = Math.max(3, Math.min(12, Math.round((startRect.width + pointerEvent.clientX - event.clientX + gap) / (unit + gap))));
+        width = Math.max(1, Math.min(12, Math.round((startRect.width + pointerEvent.clientX - event.clientX + gap) / (unit + gap))));
         height = Math.max(5, Math.min(36, Math.round((startRect.height + pointerEvent.clientY - event.clientY + gap) / (row + gap))));
         card.style.gridColumn = `${start.x} / span ${width}`;
         card.style.gridRow = `${start.y} / span ${height}`;
@@ -715,7 +715,7 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
   getWidgetSize(id) {
     const size = this.getDashboard().sizes?.[id];
     const normalized = { "span-4": "compact", "span-6": "standard", "span-8": "wide", "span-12": "full" }[size] || size;
-    return ["compact", "standard", "wide", "full"].includes(normalized) || /^span-(?:[3-7]|9|1[01])$/.test(normalized) ? normalized : "auto";
+    return ["compact", "standard", "wide", "full"].includes(normalized) || /^span-(?:[1-9]|1[0-2])$/.test(normalized) ? normalized : "auto";
   }
   getWidgetSpan(id) {
     const size = this.getWidgetSize(id), custom = /^span-(\d+)$/.exec(size);
@@ -731,7 +731,7 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     if (legacyHeight >= 140) return Math.max(5, Math.min(36, Math.round((legacyHeight + 12) / 28)));
     return { capture: 12, tasks: 14, shortcuts: 13, library: 11, week: 11, inbox: 8, focus: 10, growth: 12, health: 12, milestone: 10, recent: 10 }[id] || 10;
   }
-  isValidWidgetLayout(layout) { return layout && Number.isInteger(layout.x) && Number.isInteger(layout.y) && Number.isInteger(layout.w) && Number.isInteger(layout.h) && layout.x >= 1 && layout.x <= 12 && layout.y >= 1 && layout.w >= 3 && layout.w <= 12 && layout.h >= 5 && layout.h <= 36 && layout.x + layout.w <= 13; }
+  isValidWidgetLayout(layout) { return layout && Number.isInteger(layout.x) && Number.isInteger(layout.y) && Number.isInteger(layout.w) && Number.isInteger(layout.h) && layout.x >= 1 && layout.x <= 12 && layout.y >= 1 && layout.w >= 1 && layout.w <= 12 && layout.h >= 5 && layout.h <= 36 && layout.x + layout.w <= 13; }
   layoutsOverlap(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
   ensureDashboardLayout() {
     const dashboard = this.getDashboard();
@@ -746,7 +746,7 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
       return { x: startX, y: 81, w: width, h: height };
     };
     for (const id of dashboard.order) {
-      const saved = dashboard.layout[id], width = Math.max(3, Math.min(12, Number(saved?.w) || this.getWidgetSpan(id))), height = Math.max(5, Math.min(36, Number(saved?.h) || this.getWidgetRowSpan(id)));
+      const saved = dashboard.layout[id], width = Math.max(1, Math.min(12, Number(saved?.w) || this.getWidgetSpan(id))), height = Math.max(5, Math.min(36, Number(saved?.h) || this.getWidgetRowSpan(id)));
       let position = this.isValidWidgetLayout(saved) ? { x: saved.x, y: saved.y, w: width, h: height } : null;
       if (!position || placed.some(item => this.layoutsOverlap(position, item))) position = findOpen(position || { x: 1, y: 1 }, width, height);
       next[id] = position;
@@ -783,7 +783,7 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
   async setWidgetGridSize(id, width, height) {
     this.ensureDashboardLayout();
     const dashboard = this.getDashboard(), current = dashboard.layout[id];
-    const next = { ...current, w: Math.max(3, Math.min(12, Math.round(width))), h: Math.max(5, Math.min(36, Math.round(height))) };
+    const next = { ...current, w: Math.max(1, Math.min(12, Math.round(width))), h: Math.max(5, Math.min(36, Math.round(height))) };
     dashboard.layout[id] = next;
     dashboard.layout[id] = this.findOpenWidgetPosition(id, Math.min(next.x, 13 - next.w), next.y);
     dashboard.sizes[id] = `span-${dashboard.layout[id].w}`;
