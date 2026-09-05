@@ -511,7 +511,7 @@ class LaunchpadView extends ItemView {
       event.preventDefault(); this.plugin.cycleWidgetSize(handle.dataset.cardResize);
     }));
     if (!desktop) return;
-    let draggedId = "", preview = null;
+    let draggedId = "", preview = null, dragPointerId = null, dragStartX = 0, dragStartY = 0, hasMoved = false;
     const grid = this.contentEl.querySelector(".lp-grid"), cards = [...this.contentEl.querySelectorAll(".lp-card[data-widget]")];
     if (!grid) return;
     const clearDragState = () => { cards.forEach(card => card.classList.remove("is-dragging")); preview?.remove(); preview = null; };
@@ -524,24 +524,41 @@ class LaunchpadView extends ItemView {
     };
     const showPreview = position => {
       if (!preview) preview = grid.createDiv({ cls: "lp-grid-drop-slot" });
-      preview.style.gridColumn = `${position.x} / span ${position.w}`;
-      preview.style.gridRow = `${position.y} / span ${position.h}`;
+      const rect = grid.getBoundingClientRect(), style = window.getComputedStyle(grid), gap = Number.parseFloat(style.columnGap) || 12;
+      const row = Number.parseFloat(style.gridAutoRows) || 16, unit = (rect.width - gap * 11) / 12;
+      preview.style.left = `${(position.x - 1) * (unit + gap)}px`;
+      preview.style.top = `${(position.y - 1) * (row + gap)}px`;
+      preview.style.width = `${unit * position.w + gap * (position.w - 1)}px`;
+      preview.style.height = `${row * position.h + gap * (position.h - 1)}px`;
     };
     this.contentEl.querySelectorAll("[data-drag-strip]").forEach(handle => {
-      handle.addEventListener("dragstart", event => {
+      handle.addEventListener("pointerdown", event => {
+        if (event.button !== 0) return;
+        event.preventDefault(); event.stopPropagation();
         draggedId = handle.dataset.dragStrip;
-        if (event.dataTransfer) { event.dataTransfer.setData("text/plain", draggedId); event.dataTransfer.effectAllowed = "move"; }
+        dragPointerId = event.pointerId; dragStartX = event.clientX; dragStartY = event.clientY; hasMoved = false;
         handle.closest("[data-widget]")?.classList.add("is-dragging");
+        handle.setPointerCapture?.(event.pointerId);
       });
-      handle.addEventListener("dragend", () => { draggedId = ""; clearDragState(); });
     });
-    grid.addEventListener("dragover", event => { if (!draggedId) return; event.preventDefault(); showPreview(getDropPosition(event)); });
-    grid.addEventListener("dragleave", event => { if (!grid.contains(event.relatedTarget)) preview?.remove(); preview = null; });
-    grid.addEventListener("drop", async event => {
-      if (!draggedId) return;
-      event.preventDefault(); const position = getDropPosition(event), id = draggedId;
-      draggedId = ""; clearDragState(); await this.plugin.setWidgetPosition(id, position);
-    });
+    const moveCard = event => {
+      if (!draggedId || event.pointerId !== dragPointerId) return;
+      if (!hasMoved && Math.hypot(event.clientX - dragStartX, event.clientY - dragStartY) < 4) return;
+      hasMoved = true; showPreview(getDropPosition(event));
+    };
+    const finishCardMove = async event => {
+      if (!draggedId || event.pointerId !== dragPointerId) return;
+      const id = draggedId, position = hasMoved ? getDropPosition(event) : null;
+      draggedId = ""; dragPointerId = null; clearDragState();
+      if (position) await this.plugin.setWidgetPosition(id, position);
+    };
+    const cancelCardMove = event => {
+      if (!draggedId || event.pointerId !== dragPointerId) return;
+      draggedId = ""; dragPointerId = null; clearDragState();
+    };
+    window.addEventListener("pointermove", moveCard);
+    window.addEventListener("pointerup", finishCardMove);
+    window.addEventListener("pointercancel", cancelCardMove);
   }
   async handleAction(action) {
     if (action === "edit-banner") return new BannerModal(this.app, this.plugin, () => this.render()).open();
@@ -863,7 +880,7 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
         const scrollBody = element.createDiv({ cls: "lp-card-scroll" });
         contentChildren.forEach(child => scrollBody.appendChild(child));
       }
-      const dragStrip = element.createEl("button", { cls: "lp-card-drag-strip", attr: { "data-drag-strip": id, "aria-label": "拖动重新摆放卡片", title: "按住横条拖动到任意空白位置", draggable: "true" } });
+      const dragStrip = element.createEl("button", { cls: "lp-card-drag-strip", attr: { "data-drag-strip": id, "aria-label": "拖动重新摆放卡片", title: "按住横条拖动到任意空白位置", draggable: "false" } });
       dragStrip.type = "button";
       const corner = element.createEl("button", { cls: "lp-card-resize-handle", attr: { "data-card-resize": id, "aria-label": "拖动右下角调整卡片宽高", title: "拖动调整宽高。按 Enter 可切换宽度" } });
       corner.type = "button";

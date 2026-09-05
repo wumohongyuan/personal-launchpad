@@ -59,7 +59,7 @@
 .lp-dashboard-toolbar { display: flex; align-items: center; justify-content: space-between; margin: 21px 2px 10px; color: var(--lp-muted); font-size: 12px; font-weight: 700; letter-spacing: .05em; }
 .lp-dashboard-toolbar button { min-height: 32px; border: 1px solid var(--lp-edge); border-radius: 9px; padding: 6px 10px; color: var(--lp-accent); background: var(--lp-surface); font-size: 12px; font-weight: 700; }
 .lp-dashboard-toolbar button:hover { border-color: var(--lp-accent); background: var(--lp-accent-soft); }
-.lp-grid { display: grid; grid-auto-flow: row; grid-auto-rows: 16px; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
+.lp-grid { position: relative; display: grid; grid-auto-flow: row; grid-auto-rows: 16px; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
 .lp-card { position: relative; z-index: 1; min-width: 0; min-height: 0; padding: 17px; border: 1px solid var(--lp-edge); border-radius: 16px; background: var(--lp-surface); box-shadow: 0 1px 2px rgba(19,44,33,.04); transition: border-color .16s ease, box-shadow .16s ease; }
 .lp-card:hover { border-color: color-mix(in srgb, var(--lp-accent) 36%, var(--lp-edge)); box-shadow: 0 7px 18px rgba(19,44,33,.06); }
 .lp-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 13px; font-size: 14px; font-weight: 750; letter-spacing: -.01em; }
@@ -172,8 +172,8 @@
 .lp-card:hover .lp-card-drag-strip,.lp-card-drag-strip:focus-visible,.lp-card.is-dragging .lp-card-drag-strip { opacity: 1; }
 .lp-card-drag-strip:hover,.lp-card-drag-strip:focus-visible { color: var(--lp-accent); background: var(--lp-accent-soft) !important; }
 .lp-card-drag-strip:active { cursor: grabbing; }
-.lp-card.is-dragging { opacity: .46; }
-.lp-grid-drop-slot { z-index: 0; min-height: 0; border: 2px dashed color-mix(in srgb, var(--lp-accent) 66%, transparent); border-radius: 14px; background: color-mix(in srgb, var(--lp-accent) 8%, transparent); pointer-events: none; }
+.lp-card.is-dragging { opacity: .68; }
+.lp-grid-drop-slot { position: absolute; z-index: 3; box-sizing: border-box; min-height: 0; border: 2px dashed color-mix(in srgb, var(--lp-accent) 76%, transparent); border-radius: 14px; background: transparent; pointer-events: none; }
 @media (min-width: 801px) {
   .lp-grid > .lp-card[data-size="compact"] { grid-column: span 4; }
   .lp-grid > .lp-card[data-size="standard"] { grid-column: span 6; }
