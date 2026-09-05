@@ -6,6 +6,12 @@ const DATA_PATH = `${DATA_FOLDER}/launchpad.json`;
 const BACKUP_FOLDER = `${DATA_FOLDER}/备份`;
 const DEFAULT_WIDGETS = ["capture", "inbox", "focus", "tasks", "growth", "health", "milestone", "week", "shortcuts", "library", "recent"];
 const WIDGET_NAMES = { capture: "闪念", focus: "今日重点", tasks: "今日行动", growth: "当前成长", health: "身体系统", milestone: "下一交付物", week: "本周复盘", shortcuts: "快捷入口", library: "在读书库", recent: "今日闪念", inbox: "闪念收件箱" };
+const DASHBOARD_LAYOUT_PRESETS = {
+  balanced: { name: "均衡日常", order: ["capture", "focus", "tasks", "growth", "health", "milestone", "week", "shortcuts", "library", "recent", "inbox"], layout: { capture: { x: 1, y: 1, w: 7, h: 12 }, focus: { x: 8, y: 1, w: 5, h: 12 }, tasks: { x: 1, y: 15, w: 7, h: 14 }, growth: { x: 8, y: 15, w: 5, h: 14 }, health: { x: 1, y: 31, w: 6, h: 12 }, milestone: { x: 7, y: 31, w: 6, h: 12 }, week: { x: 1, y: 45, w: 6, h: 11 }, shortcuts: { x: 7, y: 45, w: 6, h: 13 }, library: { x: 1, y: 58, w: 7, h: 11 }, recent: { x: 8, y: 58, w: 5, h: 11 }, inbox: { x: 1, y: 71, w: 12, h: 8 } } },
+  focus: { name: "专注工作", order: ["capture", "focus", "tasks", "milestone", "shortcuts", "growth", "health", "week", "library", "recent", "inbox"], layout: { capture: { x: 1, y: 1, w: 7, h: 12 }, focus: { x: 8, y: 1, w: 5, h: 12 }, tasks: { x: 1, y: 15, w: 7, h: 16 }, milestone: { x: 8, y: 15, w: 5, h: 16 }, shortcuts: { x: 1, y: 33, w: 7, h: 13 }, growth: { x: 8, y: 33, w: 5, h: 13 }, health: { x: 1, y: 48, w: 6, h: 12 }, week: { x: 7, y: 48, w: 6, h: 12 }, library: { x: 1, y: 62, w: 7, h: 11 }, recent: { x: 8, y: 62, w: 5, h: 11 }, inbox: { x: 1, y: 75, w: 12, h: 8 } } },
+  learning: { name: "学习阅读", order: ["capture", "focus", "library", "shortcuts", "tasks", "week", "growth", "milestone", "health", "recent", "inbox"], layout: { capture: { x: 1, y: 1, w: 6, h: 12 }, focus: { x: 7, y: 1, w: 6, h: 12 }, library: { x: 1, y: 15, w: 7, h: 14 }, shortcuts: { x: 8, y: 15, w: 5, h: 14 }, tasks: { x: 1, y: 31, w: 7, h: 14 }, week: { x: 8, y: 31, w: 5, h: 14 }, growth: { x: 1, y: 47, w: 6, h: 12 }, milestone: { x: 7, y: 47, w: 6, h: 12 }, health: { x: 1, y: 61, w: 6, h: 12 }, recent: { x: 7, y: 61, w: 6, h: 12 }, inbox: { x: 1, y: 75, w: 12, h: 8 } } },
+  health: { name: "运动健康", order: ["health", "tasks", "capture", "focus", "week", "growth", "milestone", "shortcuts", "library", "recent", "inbox"], layout: { health: { x: 1, y: 1, w: 7, h: 14 }, tasks: { x: 8, y: 1, w: 5, h: 14 }, capture: { x: 1, y: 17, w: 7, h: 12 }, focus: { x: 8, y: 17, w: 5, h: 12 }, week: { x: 1, y: 31, w: 6, h: 12 }, growth: { x: 7, y: 31, w: 6, h: 12 }, milestone: { x: 1, y: 45, w: 6, h: 12 }, shortcuts: { x: 7, y: 45, w: 6, h: 13 }, library: { x: 1, y: 60, w: 7, h: 11 }, recent: { x: 8, y: 60, w: 5, h: 11 }, inbox: { x: 1, y: 73, w: 12, h: 8 } } }
+};
 
 const DAILY_MESSAGES = [
   { text: "行而不辍，未来可期。", source: "《荀子》" },
@@ -94,10 +100,10 @@ function escapeHtml(text) {
   return String(text || "").replace(/[&<>'\"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[c]));
 }
 function defaultTasks(phase) { return Array.isArray(phase && phase.tasks) ? phase.tasks : ["明确今天的一件重点", "完成一个最小动作", "记录一条闪念", "安排一点恢复时间"]; }
-function defaultDashboard() { return { order: [...DEFAULT_WIDGETS], hidden: [], sizes: {}, heights: {}, layout: {}, customWidgets: [] }; }
+function defaultDashboard() { return { order: [...DEFAULT_WIDGETS], hidden: [], sizes: {}, heights: {}, layout: {}, mobileOrder: [], locked: {}, customWidgets: [] }; }
 function freshData() {
   return {
-    version: 9,
+    version: 10,
     banner: { mode: "daily", customText: "今天也要向前一点点。", customSource: "给未来的自己", image: "" },
     growth: { planId: "balanced", planName: "84 天行动计划", totalDays: 84, startDate: todayKey(), stage: "启动期", week: 1, goal: "建立可持续的行动、复盘与恢复节奏", customPlan: null, externalFeedback: [], completedMilestones: [] },
     shortcuts: [
@@ -316,13 +322,41 @@ class CustomWidgetModal extends Modal {
   }
 }
 
+class ConfirmModal extends Modal {
+  constructor(app, title, message, onConfirm) { super(app); this.title = title; this.message = message; this.onConfirm = onConfirm; }
+  onOpen() {
+    this.contentEl.createEl("h2", { text: this.title }); this.contentEl.createEl("p", { text: this.message });
+    new Setting(this.contentEl).addButton(button => button.setButtonText("取消").onClick(() => this.close())).addButton(button => button.setButtonText("确认").setWarning().onClick(async () => { await this.onConfirm(); this.close(); }));
+  }
+}
+class CardLayoutModal extends Modal {
+  constructor(app, plugin, id, onSave) { super(app); this.plugin = plugin; this.id = id; this.onSave = onSave; }
+  onOpen() { this.render(); }
+  render() {
+    const dashboard = this.plugin.getDashboard(), custom = dashboard.customWidgets.find(widget => widget.id === this.id), title = custom?.title || WIDGET_NAMES[this.id] || "卡片";
+    this.contentEl.empty(); this.contentEl.addClass("lp-card-layout-modal"); this.contentEl.createEl("h2", { text: `调整「${title}」` }); this.contentEl.createEl("p", { text: "适合手机和平板：不需要拖动，也能控制显示、顺序和宽度。" });
+    new Setting(this.contentEl).setName("显示这张卡片").addToggle(toggle => toggle.setValue(!dashboard.hidden.includes(this.id)).onChange(async visible => { await this.plugin.setWidgetVisibility(this.id, visible); this.onSave(); }));
+    new Setting(this.contentEl).setName("卡片宽度").setDesc("手机上会自动适配为单列或双列。")
+      .addDropdown(dropdown => dropdown.addOptions({ auto: "默认", "span-1": "1 列", "span-2": "2 列", "span-3": "3 列", "span-4": "4 列", "span-5": "5 列", "span-6": "6 列", "span-7": "7 列", "span-8": "8 列", "span-9": "9 列", "span-10": "10 列", "span-11": "11 列", "span-12": "12 列" }).setValue(this.plugin.getWidgetSize(this.id)).onChange(async size => { await this.plugin.setWidgetSize(this.id, size); this.onSave(); this.render(); }));
+    new Setting(this.contentEl).setName("手机 / 平板顺序").addButton(button => button.setButtonText("上移").onClick(async () => { await this.plugin.moveWidgetInResponsiveOrder(this.id, -1); this.onSave(); this.render(); })).addButton(button => button.setButtonText("下移").onClick(async () => { await this.plugin.moveWidgetInResponsiveOrder(this.id, 1); this.onSave(); this.render(); }));
+    new Setting(this.contentEl).setName("锁定布局").setDesc("锁定后，电脑端不能拖动或缩放这张卡片。")
+      .addToggle(toggle => toggle.setValue(this.plugin.isWidgetLocked(this.id)).onChange(async locked => { await this.plugin.setWidgetLocked(this.id, locked); this.onSave(); this.render(); }));
+  }
+}
 class DashboardLayoutModal extends Modal {
-  constructor(app, plugin, onSave) { super(app); this.plugin = plugin; this.onSave = onSave; }
+  constructor(app, plugin, onSave) { super(app); this.plugin = plugin; this.onSave = onSave; this.presetId = "balanced"; }
   onOpen() { this.render(); }
   render() {
     const { contentEl } = this, dashboard = this.plugin.getDashboard();
     contentEl.empty(); contentEl.createEl("h2", { text: "定制主页" });
     contentEl.createEl("p", { text: "电脑端先点击“调整布局”，再拖住顶部横条摆放到空位、拖动右下角改变宽高。这里适合在平板和手机上调整显示、顺序和每张卡片的列宽；不会删除你的笔记或记录。" });
+    new Setting(contentEl).setName("布局预设").setDesc("应用后仍可自由移动、缩放和继续编辑。")
+      .addDropdown(dropdown => dropdown.addOptions({ balanced: "均衡日常", focus: "专注工作", learning: "学习阅读", health: "运动健康" }).setValue(this.presetId).onChange(value => { this.presetId = value; }))
+      .addButton(button => button.setButtonText("应用预设").setCta().onClick(() => new ConfirmModal(this.app, "应用布局预设", "这会重新摆放卡片，但不会删除笔记、闪念、任务或训练记录。", async () => { await this.plugin.applyLayoutPreset(this.presetId); this.onSave(); this.render(); }).open()));
+    new Setting(contentEl).setName("手机 / 平板顺序").setDesc("默认跟随电脑布局的从上到下、从左到右顺序。")
+      .addButton(button => button.setButtonText("恢复跟随电脑").onClick(async () => { await this.plugin.clearResponsiveWidgetOrder(); this.onSave(); this.render(); }));
+    new Setting(contentEl).setName("恢复默认布局").setDesc("只恢复卡片布局和尺寸，不影响任何笔记数据。")
+      .addButton(button => button.setButtonText("恢复默认").setWarning().onClick(() => new ConfirmModal(this.app, "恢复默认布局", "将清除当前卡片的位置和尺寸设置。你的笔记、闪念、任务和训练记录不会受到影响。", async () => { await this.plugin.restoreDefaultDashboardLayout(); this.onSave(); this.render(); }).open()));
     for (const id of dashboard.order) {
       const custom = dashboard.customWidgets.find(widget => widget.id === id);
       const title = custom ? custom.title : WIDGET_NAMES[id];
@@ -330,8 +364,8 @@ class DashboardLayoutModal extends Modal {
       new Setting(contentEl).setName(title).setDesc(custom ? "自定义卡片" : "系统卡片")
         .addToggle(toggle => toggle.setValue(!dashboard.hidden.includes(id)).onChange(async visible => { await this.plugin.setWidgetVisibility(id, visible); this.onSave(); }))
         .addDropdown(dropdown => dropdown.addOptions({ auto: "默认", compact: "紧凑（4列）", standard: "标准（6列）", wide: "宽幅（8列）", full: "全宽（12列）", "span-1": "自由尺寸（1列）", "span-2": "自由尺寸（2列）", "span-3": "自由尺寸（3列）", "span-4": "自由尺寸（4列）", "span-5": "自由尺寸（5列）", "span-6": "自由尺寸（6列）", "span-7": "自由尺寸（7列）", "span-8": "自由尺寸（8列）", "span-9": "自由尺寸（9列）", "span-10": "自由尺寸（10列）", "span-11": "自由尺寸（11列）", "span-12": "自由尺寸（12列）" }).setValue(this.plugin.getWidgetSize(id)).onChange(async size => { await this.plugin.setWidgetSize(id, size); this.onSave(); this.render(); }))
-        .addExtraButton(button => button.setIcon("chevron-up").setTooltip("上移").onClick(async () => { await this.plugin.moveWidget(id, -1); this.onSave(); this.render(); }))
-        .addExtraButton(button => button.setIcon("chevron-down").setTooltip("下移").onClick(async () => { await this.plugin.moveWidget(id, 1); this.onSave(); this.render(); }));
+        .addExtraButton(button => button.setIcon("chevron-up").setTooltip("上移").onClick(async () => { await this.plugin.moveWidgetInResponsiveOrder(id, -1); this.onSave(); this.render(); }))
+        .addExtraButton(button => button.setIcon("chevron-down").setTooltip("下移").onClick(async () => { await this.plugin.moveWidgetInResponsiveOrder(id, 1); this.onSave(); this.render(); }));
       if (custom) new Setting(contentEl).setName("移除「" + title + "」").setDesc("只移除这张卡片，不影响其它笔记。")
         .addButton(button => button.setButtonText("移除").setWarning().onClick(async () => { await this.plugin.removeCustomWidget(id); this.onSave(); this.render(); }));
     }
@@ -340,12 +374,43 @@ class DashboardLayoutModal extends Modal {
   }
 }
 class LaunchpadView extends ItemView {
-  constructor(leaf, plugin) { super(leaf); this.plugin = plugin; this.layoutEditing = false; this.layoutEditingSnapshot = null; this.dashboardInteractionAbort = null; }
+  constructor(leaf, plugin) { super(leaf); this.plugin = plugin; this.layoutEditing = false; this.layoutEditingSnapshot = null; this.layoutHistory = []; this.dashboardInteractionAbort = null; this.flashDraft = null; this.clearFlashDraft = false; this.dashboardScrollTop = 0; }
   getViewType() { return VIEW_TYPE; }
   getDisplayText() { return "个人启动台"; }
   getIcon() { return "layout-dashboard"; }
   async onOpen() { await this.render(); }
   async onClose() { this.dashboardInteractionAbort?.abort(); this.contentEl.empty(); }
+  captureTransientState() {
+    const flash = this.contentEl.querySelector("[data-role=flash]"), type = this.contentEl.querySelector("[data-role=flash-type]");
+    if (this.clearFlashDraft) this.flashDraft = null;
+    else if (flash) this.flashDraft = { text: flash.value, type: type?.value || "闪念" };
+    const scroller = this.contentEl.closest(".view-content") || this.contentEl.parentElement;
+    if (scroller) this.dashboardScrollTop = scroller.scrollTop;
+  }
+  restoreTransientState() {
+    const flash = this.contentEl.querySelector("[data-role=flash]"), type = this.contentEl.querySelector("[data-role=flash-type]");
+    if (flash && this.flashDraft) { flash.value = this.flashDraft.text || ""; if (type) type.value = this.flashDraft.type || "闪念"; }
+    const scrollTop = this.dashboardScrollTop, scroller = this.contentEl.closest(".view-content") || this.contentEl.parentElement;
+    if (scroller) window.requestAnimationFrame(() => { scroller.scrollTop = scrollTop; });
+    this.clearFlashDraft = false;
+  }
+  layoutSnapshot() {
+    this.plugin.ensureDashboardLayout();
+    const dashboard = this.plugin.getDashboard();
+    return { layout: JSON.parse(JSON.stringify(dashboard.layout || {})), sizes: JSON.parse(JSON.stringify(dashboard.sizes || {})), heights: JSON.parse(JSON.stringify(dashboard.heights || {})) };
+  }
+  rememberLayout() {
+    this.layoutHistory.push(this.layoutSnapshot());
+    if (this.layoutHistory.length > 20) this.layoutHistory.shift();
+  }
+  async applyLayoutSnapshot(snapshot, notice) {
+    const dashboard = this.plugin.getDashboard();
+    dashboard.layout = JSON.parse(JSON.stringify(snapshot.layout));
+    dashboard.sizes = JSON.parse(JSON.stringify(snapshot.sizes));
+    dashboard.heights = JSON.parse(JSON.stringify(snapshot.heights));
+    await this.plugin.saveVaultData(); await this.plugin.refreshViews();
+    if (notice) new Notice(notice);
+  }
   day() {
     const key = todayKey();
     if (!this.plugin.data.days[key]) this.plugin.data.days[key] = { tasks: defaultTasks(this.plugin.getGrowthState().phase).map(text => ({ text, done: false })), flashes: [] };
@@ -387,7 +452,7 @@ class LaunchpadView extends ItemView {
         <div class="lp-plan-progress" aria-label="${planLabel}进度"><i style="width:${growthState.planPercent}%"></i><span>${planLabel} · 第 ${growthState.day} / ${growthState.plan.days} 天 · ${growthState.planPercent}%</span></div>
         <button data-action="edit-banner" class="lp-banner-settings" aria-label="推送与横幅设置">⚙</button>
       </section>
-      <div class="lp-dashboard-toolbar"><span>今日工作台</span><span class="lp-dashboard-actions"><button data-action="toggle-layout-editing" class="lp-layout-edit-toggle" aria-pressed="${this.layoutEditing}">${this.layoutEditing ? "完成调整" : "调整布局"}</button><button data-action="restore-layout" class="lp-layout-restore">↶ 还原本次调整</button><button data-action="customize-dashboard">▦ 定制主页</button></span></div>
+      <div class="lp-dashboard-toolbar"><span>今日工作台</span><span class="lp-dashboard-actions"><button data-action="toggle-layout-editing" class="lp-layout-edit-toggle" aria-pressed="${this.layoutEditing}">${this.layoutEditing ? "完成调整" : "调整布局"}</button><button data-action="undo-layout" class="lp-layout-undo">↶ 撤销一步</button><button data-action="restore-layout" class="lp-layout-restore">↶ 还原本次调整</button><button data-action="customize-dashboard">▦ 定制主页</button></span></div>
       <main class="lp-grid">
         <section class="lp-card lp-capture-card" data-widget="capture">
           <div class="lp-heading"><span>✦ 闪念</span><small>先捕捉，后整理</small></div>
@@ -452,6 +517,7 @@ class LaunchpadView extends ItemView {
       </main>`;
     this.plugin.applyDashboardLayout(root);
     this.bindEvents();
+    this.restoreTransientState();
   }
   bindEvents() {
     this.contentEl.querySelectorAll("[data-task]").forEach(input => input.addEventListener("change", async e => {
@@ -482,26 +548,33 @@ class LaunchpadView extends ItemView {
   }
   bindDashboardInteractions() {
     this.contentEl.querySelectorAll("[data-resize-widget]").forEach(button => button.addEventListener("click", () => this.plugin.cycleWidgetSize(button.dataset.resizeWidget)));
+    this.contentEl.querySelectorAll("[data-card-layout]").forEach(button => button.addEventListener("click", () => new CardLayoutModal(this.app, this.plugin, button.dataset.cardLayout, () => this.render()).open()));
+    this.contentEl.querySelectorAll("[data-lock-widget]").forEach(button => button.addEventListener("click", () => this.plugin.setWidgetLocked(button.dataset.lockWidget, !this.plugin.isWidgetLocked(button.dataset.lockWidget))));
     const desktop = window.matchMedia("(min-width: 801px)").matches;
     if (desktop) this.contentEl.querySelectorAll("[data-card-resize]").forEach(handle => handle.addEventListener("pointerdown", event => {
       if (!this.layoutEditing || event.button !== 0) return;
       const card = handle.closest(".lp-card[data-widget]"), grid = card?.closest(".lp-grid"), id = card?.dataset.widget;
       if (!card || !grid || !id) return;
+      if (this.plugin.isWidgetLocked(id)) return new Notice("这张卡片已锁定；点击标题右侧的“解锁”后再调整。");
+      this.rememberLayout();
       event.preventDefault(); event.stopPropagation();
       const gridStyle = window.getComputedStyle(grid), gap = Number.parseFloat(gridStyle.columnGap) || 12;
       const row = Number.parseFloat(gridStyle.gridAutoRows) || 16, unit = (grid.getBoundingClientRect().width - gap * 11) / 12;
       const start = this.plugin.getWidgetLayout(id), startRect = card.getBoundingClientRect();
       let width = start.w, height = start.h;
-      card.classList.add("is-resizing");
+      const resizeBadge = card.createDiv({ cls: "lp-resize-badge" });
+      const updateResizeBadge = () => { resizeBadge.textContent = `${width} 列 × ${height} 行`; };
+      updateResizeBadge(); card.classList.add("is-resizing");
       const move = pointerEvent => {
         width = Math.max(1, Math.min(12, Math.round((startRect.width + pointerEvent.clientX - event.clientX + gap) / (unit + gap))));
         height = Math.max(5, Math.min(36, Math.round((startRect.height + pointerEvent.clientY - event.clientY + gap) / (row + gap))));
         card.style.gridColumn = `${start.x} / span ${width}`;
         card.style.gridRow = `${start.y} / span ${height}`;
+        updateResizeBadge();
       };
       const finish = async () => {
         window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", finish); window.removeEventListener("pointercancel", finish);
-        card.classList.remove("is-resizing");
+        resizeBadge.remove(); card.classList.remove("is-resizing");
         if (width !== start.w || height !== start.h) await this.plugin.setWidgetGridSize(id, width, height);
       };
       window.addEventListener("pointermove", move); window.addEventListener("pointerup", finish); window.addEventListener("pointercancel", finish);
@@ -513,7 +586,7 @@ class LaunchpadView extends ItemView {
     if (!desktop) return;
     this.dashboardInteractionAbort?.abort(); this.dashboardInteractionAbort = new AbortController();
     const interactionSignal = this.dashboardInteractionAbort.signal;
-    let draggedId = "", preview = null, dragPointerId = null, dragStartX = 0, dragStartY = 0, hasMoved = false;
+    let draggedId = "", preview = null, dragPointerId = null, dragStartX = 0, dragStartY = 0, hasMoved = false, dragSnapshot = null;
     const grid = this.contentEl.querySelector(".lp-grid"), cards = [...this.contentEl.querySelectorAll(".lp-card[data-widget]")];
     if (!grid) return;
     const clearDragState = () => { cards.forEach(card => card.classList.remove("is-dragging")); preview?.remove(); preview = null; };
@@ -522,10 +595,13 @@ class LaunchpadView extends ItemView {
       const row = Number.parseFloat(style.gridAutoRows) || 16, unit = (rect.width - gap * 11) / 12;
       const x = Math.max(1, Math.min(12, Math.floor((event.clientX - rect.left) / (unit + gap)) + 1));
       const y = Math.max(1, Math.floor((event.clientY - rect.top) / (row + gap)) + 1);
-      return this.plugin.findOpenWidgetPosition(draggedId, x, y);
+      const position = this.plugin.findOpenWidgetPosition(draggedId, x, y);
+      return { ...position, adjusted: position.x !== x || position.y !== y };
     };
     const showPreview = position => {
-      if (!preview) preview = grid.createDiv({ cls: "lp-grid-drop-slot" });
+      if (!preview) preview = grid.createDiv({ cls: "lp-grid-drop-slot", attr: { "aria-hidden": "true" } });
+      preview.dataset.hint = position.adjusted ? "最近可用位置" : "松开摆放";
+      preview.classList.toggle("is-adjusted", Boolean(position.adjusted));
       const rect = grid.getBoundingClientRect(), style = window.getComputedStyle(grid), gap = Number.parseFloat(style.columnGap) || 12;
       const row = Number.parseFloat(style.gridAutoRows) || 16, unit = (rect.width - gap * 11) / 12;
       preview.style.left = `${(position.x - 1) * (unit + gap)}px`;
@@ -536,9 +612,10 @@ class LaunchpadView extends ItemView {
     this.contentEl.querySelectorAll("[data-drag-strip]").forEach(handle => {
       handle.addEventListener("pointerdown", event => {
         if (!this.layoutEditing || event.button !== 0) return;
+        if (this.plugin.isWidgetLocked(handle.dataset.dragStrip)) return new Notice("这张卡片已锁定；点击标题右侧的“解锁”后再调整。");
         event.preventDefault(); event.stopPropagation();
         draggedId = handle.dataset.dragStrip;
-        dragPointerId = event.pointerId; dragStartX = event.clientX; dragStartY = event.clientY; hasMoved = false;
+        dragPointerId = event.pointerId; dragStartX = event.clientX; dragStartY = event.clientY; hasMoved = false; dragSnapshot = this.layoutSnapshot();
         handle.closest("[data-widget]")?.classList.add("is-dragging");
         handle.setPointerCapture?.(event.pointerId);
       });
@@ -546,17 +623,18 @@ class LaunchpadView extends ItemView {
     const moveCard = event => {
       if (!draggedId || event.pointerId !== dragPointerId) return;
       if (!hasMoved && Math.hypot(event.clientX - dragStartX, event.clientY - dragStartY) < 4) return;
-      hasMoved = true; showPreview(getDropPosition(event));
+      if (!hasMoved) { hasMoved = true; if (dragSnapshot) this.layoutHistory.push(dragSnapshot); }
+      showPreview(getDropPosition(event));
     };
     const finishCardMove = async event => {
       if (!draggedId || event.pointerId !== dragPointerId) return;
       const id = draggedId, position = hasMoved ? getDropPosition(event) : null;
-      draggedId = ""; dragPointerId = null; clearDragState();
+      draggedId = ""; dragPointerId = null; dragSnapshot = null; clearDragState();
       if (position) await this.plugin.setWidgetPosition(id, position);
     };
     const cancelCardMove = event => {
       if (!draggedId || event.pointerId !== dragPointerId) return;
-      draggedId = ""; dragPointerId = null; clearDragState();
+      draggedId = ""; dragPointerId = null; dragSnapshot = null; clearDragState();
     };
     window.addEventListener("pointermove", moveCard, { signal: interactionSignal });
     window.addEventListener("pointerup", finishCardMove, { signal: interactionSignal });
@@ -567,7 +645,7 @@ class LaunchpadView extends ItemView {
     if (!this.layoutEditing) {
       this.plugin.ensureDashboardLayout();
       const dashboard = this.plugin.getDashboard();
-      this.layoutEditingSnapshot = { layout: JSON.parse(JSON.stringify(dashboard.layout || {})), sizes: JSON.parse(JSON.stringify(dashboard.sizes || {})), heights: JSON.parse(JSON.stringify(dashboard.heights || {})) };
+      this.layoutEditingSnapshot = this.layoutSnapshot(); this.layoutHistory = [];
       this.layoutEditing = true;
     } else {
       this.layoutEditing = false; this.layoutEditingSnapshot = null;
@@ -576,18 +654,22 @@ class LaunchpadView extends ItemView {
   }
   async restoreLayoutEditing() {
     if (!this.layoutEditingSnapshot) return new Notice("还没有可还原的布局修改");
-    const dashboard = this.plugin.getDashboard();
-    dashboard.layout = JSON.parse(JSON.stringify(this.layoutEditingSnapshot.layout));
-    dashboard.sizes = JSON.parse(JSON.stringify(this.layoutEditingSnapshot.sizes));
-    dashboard.heights = JSON.parse(JSON.stringify(this.layoutEditingSnapshot.heights));
-    await this.plugin.saveVaultData(); await this.render(); new Notice("已还原本次布局调整");
+    this.layoutHistory = [];
+    await this.applyLayoutSnapshot(this.layoutEditingSnapshot, "已还原本次布局调整");
+  }
+  async undoLayout() {
+    const snapshot = this.layoutHistory.pop();
+    if (!snapshot) return new Notice("没有可撤销的布局操作");
+    await this.applyLayoutSnapshot(snapshot, "已撤销上一步布局调整");
   }
   async handleAction(action) {
     if (action === "toggle-layout-editing") return this.toggleLayoutEditing();
+    if (action === "undo-layout") return this.undoLayout();
     if (action === "restore-layout") return this.restoreLayoutEditing();
     if (action === "edit-banner") return new BannerModal(this.app, this.plugin, () => this.render()).open();
     if (action === "customize-dashboard") return new DashboardLayoutModal(this.app, this.plugin, () => this.render()).open();
     if (action === "save-flash") {
+      this.clearFlashDraft = true;
       const text = this.contentEl.querySelector("[data-role=flash]").value.trim();
       const type = this.contentEl.querySelector("[data-role=flash-type]").value;
       if (!text) return new Notice("先写下一点内容，再保存。", 2500);
@@ -660,10 +742,12 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     this.data.dashboard.sizes = this.data.dashboard.sizes && typeof this.data.dashboard.sizes === "object" ? this.data.dashboard.sizes : {};
     this.data.dashboard.heights = this.data.dashboard.heights && typeof this.data.dashboard.heights === "object" ? this.data.dashboard.heights : {};
     this.data.dashboard.layout = this.data.dashboard.layout && typeof this.data.dashboard.layout === "object" ? this.data.dashboard.layout : {};
+    this.data.dashboard.mobileOrder = Array.isArray(this.data.dashboard.mobileOrder) ? this.data.dashboard.mobileOrder : [];
+    this.data.dashboard.locked = this.data.dashboard.locked && typeof this.data.dashboard.locked === "object" ? this.data.dashboard.locked : {};
     for (const id of DEFAULT_WIDGETS) if (!this.data.dashboard.order.includes(id)) this.data.dashboard.order.push(id);
     if (!isNewInstall && rawData && typeof rawData.onboardingComplete !== "boolean") this.data.onboardingComplete = true;
     this.data.onboardingComplete = Boolean(this.data.onboardingComplete);
-    this.data.version = 9;
+    this.data.version = 10;
   }
   async saveVaultData() {
     const text = JSON.stringify(this.data, null, 2);
@@ -753,6 +837,43 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     new Notice("启动台已按你的选择创建。");
   }
   getDashboard() { return this.data.dashboard || defaultDashboard(); }
+  getResponsiveWidgetOrder() {
+    const dashboard = this.getDashboard(), original = [...dashboard.order];
+    const spatial = [...original].sort((a, b) => {
+      const left = dashboard.layout?.[a], right = dashboard.layout?.[b];
+      if (this.isValidWidgetLayout(left) && this.isValidWidgetLayout(right)) return left.y - right.y || left.x - right.x || original.indexOf(a) - original.indexOf(b);
+      if (this.isValidWidgetLayout(left)) return -1;
+      if (this.isValidWidgetLayout(right)) return 1;
+      return original.indexOf(a) - original.indexOf(b);
+    });
+    const manual = Array.isArray(dashboard.mobileOrder) ? dashboard.mobileOrder.filter(id => original.includes(id)) : [];
+    return manual.length ? [...manual, ...spatial.filter(id => !manual.includes(id))] : spatial;
+  }
+  async moveWidgetInResponsiveOrder(id, direction) {
+    const dashboard = this.getDashboard(), order = this.getResponsiveWidgetOrder(), current = order.indexOf(id), target = current + direction;
+    if (current < 0 || target < 0 || target >= order.length) return;
+    [order[current], order[target]] = [order[target], order[current]];
+    dashboard.mobileOrder = order;
+    await this.saveVaultData(); await this.refreshViews();
+  }
+  async clearResponsiveWidgetOrder() {
+    this.getDashboard().mobileOrder = [];
+    await this.saveVaultData(); await this.refreshViews(); new Notice("手机与平板将跟随电脑布局顺序。");
+  }
+  async applyLayoutPreset(id) {
+    const preset = DASHBOARD_LAYOUT_PRESETS[id] || DASHBOARD_LAYOUT_PRESETS.balanced, dashboard = this.getDashboard();
+    const customIds = dashboard.order.filter(widgetId => !DEFAULT_WIDGETS.includes(widgetId));
+    dashboard.order = [...preset.order, ...customIds.filter(widgetId => !preset.order.includes(widgetId))];
+    dashboard.layout = JSON.parse(JSON.stringify(preset.layout));
+    dashboard.sizes = Object.fromEntries(Object.entries(preset.layout).map(([widgetId, layout]) => [widgetId, `span-${layout.w}`]));
+    dashboard.heights = {}; dashboard.mobileOrder = [];
+    this.ensureDashboardLayout(); await this.saveVaultData(); await this.refreshViews(); new Notice(`已应用「${preset.name}」布局，可继续自由调整。`);
+  }
+  async restoreDefaultDashboardLayout() {
+    const dashboard = this.getDashboard(), customIds = dashboard.order.filter(id => !DEFAULT_WIDGETS.includes(id));
+    dashboard.order = [...DEFAULT_WIDGETS, ...customIds]; dashboard.layout = {}; dashboard.sizes = {}; dashboard.heights = {}; dashboard.mobileOrder = [];
+    this.ensureDashboardLayout(); await this.saveVaultData(); await this.refreshViews(); new Notice("已恢复默认布局。");
+  }
   getWidgetSize(id) {
     const size = this.getDashboard().sizes?.[id];
     const normalized = { "span-4": "compact", "span-6": "standard", "span-8": "wide", "span-12": "full" }[size] || size;
@@ -842,6 +963,13 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     await this.setWidgetSize(id, next);
     new Notice(`「${WIDGET_NAMES[id] || "卡片"}」宽度：${{ auto: "默认", compact: "紧凑", standard: "标准", wide: "宽幅", full: "全宽" }[next]}`);
   }
+  isWidgetLocked(id) { return Boolean(this.getDashboard().locked?.[id]); }
+  async setWidgetLocked(id, locked) {
+    const dashboard = this.getDashboard();
+    if (!dashboard.locked || typeof dashboard.locked !== "object") dashboard.locked = {};
+    if (locked) dashboard.locked[id] = true; else delete dashboard.locked[id];
+    await this.saveVaultData(); await this.refreshViews(); new Notice(locked ? `已锁定「${WIDGET_NAMES[id] || "卡片"}」布局。` : `已解除「${WIDGET_NAMES[id] || "卡片"}」的布局锁定。`);
+  }
   async setWidgetVisibility(id, visible) {
     const dashboard = this.getDashboard();
     dashboard.hidden = visible ? dashboard.hidden.filter(item => item !== id) : [...new Set([...dashboard.hidden, id])];
@@ -867,6 +995,8 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     if (dashboard.sizes) delete dashboard.sizes[id];
     if (dashboard.heights) delete dashboard.heights[id];
     if (dashboard.layout) delete dashboard.layout[id];
+    if (dashboard.locked) delete dashboard.locked[id];
+    if (Array.isArray(dashboard.mobileOrder)) dashboard.mobileOrder = dashboard.mobileOrder.filter(item => item !== id);
     await this.saveVaultData(); await this.refreshViews();
   }
   renderCustomWidgets() {
@@ -882,8 +1012,9 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
   applyDashboardLayout(root) {
     const dashboard = this.getDashboard(), desktop = window.matchMedia("(min-width: 801px)").matches;
     if (desktop) this.ensureDashboardLayout();
+    const displayOrder = desktop ? dashboard.order : this.getResponsiveWidgetOrder();
     root.querySelectorAll("[data-widget]").forEach(element => {
-      const id = element.dataset.widget, index = dashboard.order.indexOf(id);
+      const id = element.dataset.widget, index = displayOrder.indexOf(id);
       if (dashboard.hidden.includes(id) || index < 0) { element.remove(); return; }
       element.style.order = String(index);
       element.dataset.size = this.getWidgetSize(id);
@@ -899,6 +1030,11 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
       existingControls.forEach(button => tools.appendChild(button));
       const resize = tools.createEl("button", { text: "↔", cls: "lp-layout-button", attr: { "data-resize-widget": id, "aria-label": "改变卡片尺寸", title: "改变卡片尺寸" } });
       resize.type = "button";
+      const mobileLayout = tools.createEl("button", { text: "调整", cls: "lp-layout-button lp-mobile-layout-button", attr: { "data-card-layout": id, "aria-label": `调整「${WIDGET_NAMES[id] || "卡片"}」`, title: "调整此卡片" } });
+      mobileLayout.type = "button";
+      const lock = tools.createEl("button", { text: this.isWidgetLocked(id) ? "解锁" : "锁定", cls: "lp-layout-lock-button", attr: { "data-lock-widget": id, "aria-label": this.isWidgetLocked(id) ? `解除「${WIDGET_NAMES[id] || "卡片"}」的布局锁定` : `锁定「${WIDGET_NAMES[id] || "卡片"}」的布局`, title: this.isWidgetLocked(id) ? "解除布局锁定" : "锁定布局" } });
+      lock.type = "button";
+      element.classList.toggle("is-layout-locked", this.isWidgetLocked(id));
       if (desktop) {
         const contentChildren = [...element.children].filter(child => child !== heading);
         const scrollBody = element.createDiv({ cls: "lp-card-scroll" });
