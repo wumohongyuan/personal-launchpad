@@ -94,10 +94,10 @@ function escapeHtml(text) {
   return String(text || "").replace(/[&<>'\"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[c]));
 }
 function defaultTasks(phase) { return Array.isArray(phase && phase.tasks) ? phase.tasks : ["明确今天的一件重点", "完成一个最小动作", "记录一条闪念", "安排一点恢复时间"]; }
-function defaultDashboard() { return { order: [...DEFAULT_WIDGETS], hidden: [], sizes: {}, heights: {}, customWidgets: [] }; }
+function defaultDashboard() { return { order: [...DEFAULT_WIDGETS], hidden: [], sizes: {}, heights: {}, layout: {}, customWidgets: [] }; }
 function freshData() {
   return {
-    version: 8,
+    version: 9,
     banner: { mode: "daily", customText: "今天也要向前一点点。", customSource: "给未来的自己", image: "" },
     growth: { planId: "balanced", planName: "84 天行动计划", totalDays: 84, startDate: todayKey(), stage: "启动期", week: 1, goal: "建立可持续的行动、复盘与恢复节奏", customPlan: null, externalFeedback: [], completedMilestones: [] },
     shortcuts: [
@@ -488,56 +488,59 @@ class LaunchpadView extends ItemView {
       const card = handle.closest(".lp-card[data-widget]"), grid = card?.closest(".lp-grid"), id = card?.dataset.widget;
       if (!card || !grid || !id) return;
       event.preventDefault(); event.stopPropagation();
-      const style = window.getComputedStyle(grid), gap = Number.parseFloat(style.columnGap) || 12;
-      const unit = (grid.getBoundingClientRect().width - gap * 11) / 12, startRect = card.getBoundingClientRect();
-      const startSpan = Math.max(4, Math.min(12, Math.round((startRect.width + gap) / (unit + gap))));
-      const startHeight = startRect.height, previousHeight = this.plugin.getWidgetHeight(id);
-      let span = startSpan, height = previousHeight || Math.round(startHeight), changedHeight = false;
+      const gridStyle = window.getComputedStyle(grid), gap = Number.parseFloat(gridStyle.columnGap) || 12;
+      const row = Number.parseFloat(gridStyle.gridAutoRows) || 16, unit = (grid.getBoundingClientRect().width - gap * 11) / 12;
+      const start = this.plugin.getWidgetLayout(id), startRect = card.getBoundingClientRect();
+      let width = start.w, height = start.h;
       card.classList.add("is-resizing");
       const move = pointerEvent => {
-        span = Math.max(4, Math.min(12, Math.round((startRect.width + pointerEvent.clientX - event.clientX + gap) / (unit + gap))));
-        const candidateHeight = Math.max(140, Math.min(820, Math.round((startHeight + pointerEvent.clientY - event.clientY) / 20) * 20));
-        if (Math.abs(pointerEvent.clientY - event.clientY) > 8) { height = candidateHeight; changedHeight = true; }
-        card.style.gridColumn = `span ${span}`;
-        if (changedHeight) { card.style.height = `${height}px`; card.classList.add("has-custom-height"); }
+        width = Math.max(3, Math.min(12, Math.round((startRect.width + pointerEvent.clientX - event.clientX + gap) / (unit + gap))));
+        height = Math.max(5, Math.min(36, Math.round((startRect.height + pointerEvent.clientY - event.clientY + gap) / (row + gap))));
+        card.style.gridColumn = `${start.x} / span ${width}`;
+        card.style.gridRow = `${start.y} / span ${height}`;
       };
       const finish = async () => {
         window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", finish); window.removeEventListener("pointercancel", finish);
         card.classList.remove("is-resizing");
-        if (span !== startSpan || changedHeight) await this.plugin.setWidgetLayout(id, span, changedHeight ? height : previousHeight);
+        if (width !== start.w || height !== start.h) await this.plugin.setWidgetGridSize(id, width, height);
       };
       window.addEventListener("pointermove", move); window.addEventListener("pointerup", finish); window.addEventListener("pointercancel", finish);
     }));
     if (desktop) this.contentEl.querySelectorAll("[data-card-resize]").forEach(handle => handle.addEventListener("keydown", event => {
       if (event.key !== "Enter" && event.key !== " ") return;
-      event.preventDefault();
-      this.plugin.cycleWidgetSize(handle.dataset.cardResize);
+      event.preventDefault(); this.plugin.cycleWidgetSize(handle.dataset.cardResize);
     }));
     if (!desktop) return;
-    let draggedId = "";
-    const cards = [...this.contentEl.querySelectorAll(".lp-card[data-widget]")];
-    const clearDragState = () => cards.forEach(card => card.classList.remove("is-dragging", "is-drop-target"));
+    let draggedId = "", preview = null;
+    const grid = this.contentEl.querySelector(".lp-grid"), cards = [...this.contentEl.querySelectorAll(".lp-card[data-widget]")];
+    if (!grid) return;
+    const clearDragState = () => { cards.forEach(card => card.classList.remove("is-dragging")); preview?.remove(); preview = null; };
+    const getDropPosition = event => {
+      const rect = grid.getBoundingClientRect(), style = window.getComputedStyle(grid), gap = Number.parseFloat(style.columnGap) || 12;
+      const row = Number.parseFloat(style.gridAutoRows) || 16, unit = (rect.width - gap * 11) / 12;
+      const x = Math.max(1, Math.min(12, Math.floor((event.clientX - rect.left) / (unit + gap)) + 1));
+      const y = Math.max(1, Math.floor((event.clientY - rect.top) / (row + gap)) + 1);
+      return this.plugin.findOpenWidgetPosition(draggedId, x, y);
+    };
+    const showPreview = position => {
+      if (!preview) preview = grid.createDiv({ cls: "lp-grid-drop-slot" });
+      preview.style.gridColumn = `${position.x} / span ${position.w}`;
+      preview.style.gridRow = `${position.y} / span ${position.h}`;
+    };
     this.contentEl.querySelectorAll("[data-drag-strip]").forEach(handle => {
       handle.addEventListener("dragstart", event => {
         draggedId = handle.dataset.dragStrip;
-        if (event.dataTransfer) {
-          event.dataTransfer.setData("text/plain", draggedId);
-          event.dataTransfer.effectAllowed = "move";
-        }
+        if (event.dataTransfer) { event.dataTransfer.setData("text/plain", draggedId); event.dataTransfer.effectAllowed = "move"; }
         handle.closest("[data-widget]")?.classList.add("is-dragging");
       });
       handle.addEventListener("dragend", () => { draggedId = ""; clearDragState(); });
     });
-    cards.forEach(card => {
-      card.addEventListener("dragover", event => { if (draggedId && card.dataset.widget !== draggedId) { event.preventDefault(); card.classList.add("is-drop-target"); } });
-      card.addEventListener("dragleave", () => card.classList.remove("is-drop-target"));
-      card.addEventListener("drop", async event => {
-        event.preventDefault();
-        const targetId = card.dataset.widget;
-        clearDragState();
-        if (draggedId && targetId) await this.plugin.moveWidgetBefore(draggedId, targetId);
-        draggedId = "";
-      });
+    grid.addEventListener("dragover", event => { if (!draggedId) return; event.preventDefault(); showPreview(getDropPosition(event)); });
+    grid.addEventListener("dragleave", event => { if (!grid.contains(event.relatedTarget)) preview?.remove(); preview = null; });
+    grid.addEventListener("drop", async event => {
+      if (!draggedId) return;
+      event.preventDefault(); const position = getDropPosition(event), id = draggedId;
+      draggedId = ""; clearDragState(); await this.plugin.setWidgetPosition(id, position);
     });
   }
   async handleAction(action) {
@@ -615,10 +618,11 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     this.data.dashboard.customWidgets = Array.isArray(this.data.dashboard.customWidgets) ? this.data.dashboard.customWidgets : [];
     this.data.dashboard.sizes = this.data.dashboard.sizes && typeof this.data.dashboard.sizes === "object" ? this.data.dashboard.sizes : {};
     this.data.dashboard.heights = this.data.dashboard.heights && typeof this.data.dashboard.heights === "object" ? this.data.dashboard.heights : {};
+    this.data.dashboard.layout = this.data.dashboard.layout && typeof this.data.dashboard.layout === "object" ? this.data.dashboard.layout : {};
     for (const id of DEFAULT_WIDGETS) if (!this.data.dashboard.order.includes(id)) this.data.dashboard.order.push(id);
     if (!isNewInstall && rawData && typeof rawData.onboardingComplete !== "boolean") this.data.onboardingComplete = true;
     this.data.onboardingComplete = Boolean(this.data.onboardingComplete);
-    this.data.version = 8;
+    this.data.version = 9;
   }
   async saveVaultData() {
     const text = JSON.stringify(this.data, null, 2);
@@ -711,7 +715,7 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
   getWidgetSize(id) {
     const size = this.getDashboard().sizes?.[id];
     const normalized = { "span-4": "compact", "span-6": "standard", "span-8": "wide", "span-12": "full" }[size] || size;
-    return ["compact", "standard", "wide", "full"].includes(normalized) || /^span-(?:[5-7]|9|1[01])$/.test(normalized) ? normalized : "auto";
+    return ["compact", "standard", "wide", "full"].includes(normalized) || /^span-(?:[3-7]|9|1[01])$/.test(normalized) ? normalized : "auto";
   }
   getWidgetSpan(id) {
     const size = this.getWidgetSize(id), custom = /^span-(\d+)$/.exec(size);
@@ -720,38 +724,82 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     if (preset) return preset;
     return { capture: 7, tasks: 7, shortcuts: 7, library: 7, week: 7, inbox: 5, focus: 5, growth: 5, health: 5, milestone: 5, recent: 5 }[id] || 5;
   }
-  getWidgetHeight(id) {
-    const height = Number(this.getDashboard().heights?.[id]);
-    return Number.isFinite(height) && height >= 140 && height <= 820 ? height : 0;
+  getWidgetRowSpan(id) {
+    const stored = Number(this.getDashboard().layout?.[id]?.h);
+    if (Number.isInteger(stored) && stored >= 5 && stored <= 36) return stored;
+    const legacyHeight = Number(this.getDashboard().heights?.[id]);
+    if (legacyHeight >= 140) return Math.max(5, Math.min(36, Math.round((legacyHeight + 12) / 28)));
+    return { capture: 12, tasks: 14, shortcuts: 13, library: 11, week: 11, inbox: 8, focus: 10, growth: 12, health: 12, milestone: 10, recent: 10 }[id] || 10;
+  }
+  isValidWidgetLayout(layout) { return layout && Number.isInteger(layout.x) && Number.isInteger(layout.y) && Number.isInteger(layout.w) && Number.isInteger(layout.h) && layout.x >= 1 && layout.x <= 12 && layout.y >= 1 && layout.w >= 3 && layout.w <= 12 && layout.h >= 5 && layout.h <= 36 && layout.x + layout.w <= 13; }
+  layoutsOverlap(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
+  ensureDashboardLayout() {
+    const dashboard = this.getDashboard();
+    if (!dashboard.layout || typeof dashboard.layout !== "object") dashboard.layout = {};
+    const next = {}, placed = [];
+    const findOpen = (preferred, width, height) => {
+      const startX = Math.max(1, Math.min(13 - width, preferred.x || 1)), startY = Math.max(1, preferred.y || 1);
+      for (let y = startY; y <= 80; y++) for (let x = 1; x <= 13 - width; x++) {
+        const candidate = { x, y, w: width, h: height };
+        if (!placed.some(item => this.layoutsOverlap(candidate, item))) return candidate;
+      }
+      return { x: startX, y: 81, w: width, h: height };
+    };
+    for (const id of dashboard.order) {
+      const saved = dashboard.layout[id], width = Math.max(3, Math.min(12, Number(saved?.w) || this.getWidgetSpan(id))), height = Math.max(5, Math.min(36, Number(saved?.h) || this.getWidgetRowSpan(id)));
+      let position = this.isValidWidgetLayout(saved) ? { x: saved.x, y: saved.y, w: width, h: height } : null;
+      if (!position || placed.some(item => this.layoutsOverlap(position, item))) position = findOpen(position || { x: 1, y: 1 }, width, height);
+      next[id] = position;
+      if (!dashboard.hidden.includes(id)) placed.push(position);
+    }
+    dashboard.layout = next;
+    return next;
+  }
+  getWidgetLayout(id) {
+    const layout = this.ensureDashboardLayout()[id];
+    return layout || { x: 1, y: 1, w: this.getWidgetSpan(id), h: this.getWidgetRowSpan(id) };
+  }
+  findOpenWidgetPosition(id, x, y) {
+    const dashboard = this.getDashboard(), current = dashboard.layout?.[id] || { x: 1, y: 1, w: this.getWidgetSpan(id), h: this.getWidgetRowSpan(id) }, width = current.w, height = current.h;
+    const occupied = Object.entries(dashboard.layout || {}).filter(([other]) => other !== id && !dashboard.hidden.includes(other)).map(([, position]) => position);
+    const fits = (left, top) => !occupied.some(item => this.layoutsOverlap({ x: left, y: top, w: width, h: height }, item));
+    const startX = Math.max(1, Math.min(13 - width, x)), startY = Math.max(1, y);
+    for (let top = startY; top <= 80; top++) {
+      const xs = [...Array(13 - width)].map((_, index) => index + 1).sort((a, b) => Math.abs(a - startX) - Math.abs(b - startX));
+      for (const left of xs) if (fits(left, top)) return { x: left, y: top, w: width, h: height };
+    }
+    return { x: startX, y: 81, w: width, h: height };
   }
   async setWidgetSize(id, size) {
+    this.ensureDashboardLayout();
     const dashboard = this.getDashboard();
     if (!dashboard.sizes || typeof dashboard.sizes !== "object") dashboard.sizes = {};
     if (size === "auto") delete dashboard.sizes[id]; else dashboard.sizes[id] = size;
+    const current = dashboard.layout[id], width = this.getWidgetSpan(id);
+    dashboard.layout[id] = { ...current, w: width };
+    dashboard.layout[id] = this.findOpenWidgetPosition(id, Math.min(current.x, 13 - width), current.y);
     await this.saveVaultData(); await this.refreshViews();
   }
-  async setWidgetLayout(id, span, height) {
+  async setWidgetGridSize(id, width, height) {
+    this.ensureDashboardLayout();
+    const dashboard = this.getDashboard(), current = dashboard.layout[id];
+    const next = { ...current, w: Math.max(3, Math.min(12, Math.round(width))), h: Math.max(5, Math.min(36, Math.round(height))) };
+    dashboard.layout[id] = next;
+    dashboard.layout[id] = this.findOpenWidgetPosition(id, Math.min(next.x, 13 - next.w), next.y);
+    dashboard.sizes[id] = `span-${dashboard.layout[id].w}`;
+    await this.saveVaultData(); await this.refreshViews();
+  }
+  async setWidgetPosition(id, position) {
+    this.ensureDashboardLayout();
     const dashboard = this.getDashboard();
-    if (!dashboard.sizes || typeof dashboard.sizes !== "object") dashboard.sizes = {};
-    if (!dashboard.heights || typeof dashboard.heights !== "object") dashboard.heights = {};
-    dashboard.sizes[id] = `span-${Math.max(4, Math.min(12, Math.round(span)))}`;
-    if (Number.isFinite(height) && height >= 140) dashboard.heights[id] = Math.min(820, Math.round(height));
+    dashboard.layout[id] = this.findOpenWidgetPosition(id, position.x, position.y);
     await this.saveVaultData(); await this.refreshViews();
   }
   async cycleWidgetSize(id) {
-    const sizes = ["auto", "compact", "standard", "wide", "full"];
-    const current = sizes.includes(this.getWidgetSize(id)) ? this.getWidgetSize(id) : "auto";
+    const sizes = ["auto", "compact", "standard", "wide", "full"], current = sizes.includes(this.getWidgetSize(id)) ? this.getWidgetSize(id) : "auto";
     const next = sizes[(sizes.indexOf(current) + 1) % sizes.length];
     await this.setWidgetSize(id, next);
-    new Notice(`「${WIDGET_NAMES[id] || "卡片"}」尺寸：${{ auto: "默认", compact: "紧凑", standard: "标准", wide: "宽幅", full: "全宽" }[next]}`);
-  }
-  async moveWidgetBefore(id, targetId) {
-    if (!id || id === targetId) return;
-    const order = this.getDashboard().order, from = order.indexOf(id), target = order.indexOf(targetId);
-    if (from < 0 || target < 0) return;
-    order.splice(from, 1);
-    order.splice(order.indexOf(targetId), 0, id);
-    await this.saveVaultData(); await this.refreshViews();
+    new Notice(`「${WIDGET_NAMES[id] || "卡片"}」宽度：${{ auto: "默认", compact: "紧凑", standard: "标准", wide: "宽幅", full: "全宽" }[next]}`);
   }
   async setWidgetVisibility(id, visible) {
     const dashboard = this.getDashboard();
@@ -777,6 +825,7 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     dashboard.hidden = dashboard.hidden.filter(item => item !== id);
     if (dashboard.sizes) delete dashboard.sizes[id];
     if (dashboard.heights) delete dashboard.heights[id];
+    if (dashboard.layout) delete dashboard.layout[id];
     await this.saveVaultData(); await this.refreshViews();
   }
   renderCustomWidgets() {
@@ -791,16 +840,17 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
   }
   applyDashboardLayout(root) {
     const dashboard = this.getDashboard(), desktop = window.matchMedia("(min-width: 801px)").matches;
+    if (desktop) this.ensureDashboardLayout();
     root.querySelectorAll("[data-widget]").forEach(element => {
       const id = element.dataset.widget, index = dashboard.order.indexOf(id);
       if (dashboard.hidden.includes(id) || index < 0) { element.remove(); return; }
       element.style.order = String(index);
       element.dataset.size = this.getWidgetSize(id);
-      element.style.gridColumn = desktop ? `span ${this.getWidgetSpan(id)}` : "";
-      const height = this.getWidgetHeight(id);
-      element.style.minHeight = "";
-      element.style.height = desktop && height ? `${height}px` : "";
-      element.classList.toggle("has-custom-height", desktop && Boolean(height));
+      const layout = desktop ? this.getWidgetLayout(id) : null;
+      element.style.gridColumn = layout ? `${layout.x} / span ${layout.w}` : "";
+      element.style.gridRow = layout ? `${layout.y} / span ${layout.h}` : "";
+      element.style.height = "";
+      element.classList.toggle("has-custom-height", desktop);
       const heading = element.querySelector(".lp-heading");
       if (!heading) return;
       const existingControls = [...heading.children].filter(child => child.tagName === "BUTTON");
@@ -808,12 +858,12 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
       existingControls.forEach(button => tools.appendChild(button));
       const resize = tools.createEl("button", { text: "↔", cls: "lp-layout-button", attr: { "data-resize-widget": id, "aria-label": "改变卡片尺寸", title: "改变卡片尺寸" } });
       resize.type = "button";
-      if (desktop && height) {
+      if (desktop) {
         const contentChildren = [...element.children].filter(child => child !== heading);
         const scrollBody = element.createDiv({ cls: "lp-card-scroll" });
         contentChildren.forEach(child => scrollBody.appendChild(child));
       }
-      const dragStrip = element.createEl("button", { cls: "lp-card-drag-strip", attr: { "data-drag-strip": id, "aria-label": "拖动重新摆放卡片", title: "按住横条拖动摆放卡片", draggable: "true" } });
+      const dragStrip = element.createEl("button", { cls: "lp-card-drag-strip", attr: { "data-drag-strip": id, "aria-label": "拖动重新摆放卡片", title: "按住横条拖动到任意空白位置", draggable: "true" } });
       dragStrip.type = "button";
       const corner = element.createEl("button", { cls: "lp-card-resize-handle", attr: { "data-card-resize": id, "aria-label": "拖动右下角调整卡片宽高", title: "拖动调整宽高。按 Enter 可切换宽度" } });
       corner.type = "button";
