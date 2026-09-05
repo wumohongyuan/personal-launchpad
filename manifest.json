@@ -1,7 +1,7 @@
 {
   "id": "personal-launchpad",
   "name": "Personal Launchpad",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "minAppVersion": "1.5.0",
   "description": "A responsive personal-growth home page with daily prompts, quick capture, and action tracking.",
   "author": "wumohongyuan",

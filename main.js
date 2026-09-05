@@ -66,12 +66,15 @@ class BannerModal extends Modal {
   onOpen() {
     const { contentEl } = this;
     const banner = this.plugin.data.banner;
-    contentEl.createEl("h2", { text: "编辑主页横幅" });
-    let text = banner.customText, source = banner.customSource, image = banner.image;
+    contentEl.createEl("h2", { text: "推送与横幅设置" });
+    let mode = banner.mode, text = banner.customText, source = banner.customSource, image = banner.image;
+    new Setting(contentEl).setName("推送模式").setDesc("每日推送会自动显示当天的名言或诗句。")
+      .addDropdown(dropdown => dropdown.addOptions({ daily: "每日推送", custom: "自定义话术" }).setValue(mode).onChange(value => mode = value));
     new Setting(contentEl).setName("自定义话术").addTextArea(t => t.setValue(text).onChange(v => text = v));
     new Setting(contentEl).setName("署名 / 出处").addText(t => t.setValue(source).onChange(v => source = v));
     new Setting(contentEl).setName("背景图片").setDesc("填写 Vault 内图片路径或 https 图片地址；留空使用渐变背景。").addText(t => t.setValue(image).onChange(v => image = v));
     new Setting(contentEl).addButton(b => b.setButtonText("保存").setCta().onClick(async () => {
+      this.plugin.data.banner.mode = mode;
       this.plugin.data.banner.customText = text.trim() || "今天也要向前一点点。";
       this.plugin.data.banner.customSource = source.trim();
       this.plugin.data.banner.image = image.trim();
@@ -232,7 +235,7 @@ class LaunchpadView extends ItemView {
         <blockquote>${escapeHtml(message.text)}</blockquote>
         <div class="lp-source">— ${escapeHtml(message.source || "每日推送")}</div>
         <div class="lp-plan-progress" aria-label="180 天计划进度"><i style="width:${growthState.planPercent}%"></i><span>180 天计划 · 第 ${growthState.day} 天 · ${growthState.planPercent}%</span></div>
-        <div class="lp-banner-mode" aria-label="推送设置"><span>推送</span><div class="lp-mode-switch"><button data-action="daily-mode" class="${!custom ? "is-active" : ""}">每日</button><button data-action="custom-mode" class="${custom ? "is-active" : ""}">自定义</button></div><button data-action="edit-banner" class="lp-banner-edit" aria-label="编辑推送内容">编辑</button></div>
+        <button data-action="edit-banner" class="lp-banner-settings" aria-label="推送与横幅设置">⚙</button>
       </section>
       <div class="lp-dashboard-toolbar"><span>今日工作台</span><button data-action="customize-dashboard">▦ 定制主页</button></div>
       <main class="lp-grid">
@@ -321,7 +324,6 @@ class LaunchpadView extends ItemView {
     this.contentEl.querySelectorAll("[data-update-counter]").forEach(button => button.addEventListener("click", () => this.plugin.updateCustomCounter(button.dataset.updateCounter)));
   }
   async handleAction(action) {
-    if (action === "daily-mode" || action === "custom-mode") { this.plugin.data.banner.mode = action === "daily-mode" ? "daily" : "custom"; await this.plugin.saveVaultData(); return this.render(); }
     if (action === "edit-banner") return new BannerModal(this.app, this.plugin, () => this.render()).open();
     if (action === "customize-dashboard") return new DashboardLayoutModal(this.app, this.plugin, () => this.render()).open();
     if (action === "save-flash") {
