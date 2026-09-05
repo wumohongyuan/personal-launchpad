@@ -496,10 +496,10 @@ class LaunchpadView extends ItemView {
       card.classList.add("is-resizing");
       const move = pointerEvent => {
         span = Math.max(4, Math.min(12, Math.round((startRect.width + pointerEvent.clientX - event.clientX + gap) / (unit + gap))));
-        const candidateHeight = Math.max(160, Math.min(820, Math.round((startHeight + pointerEvent.clientY - event.clientY) / 20) * 20));
+        const candidateHeight = Math.max(140, Math.min(820, Math.round((startHeight + pointerEvent.clientY - event.clientY) / 20) * 20));
         if (Math.abs(pointerEvent.clientY - event.clientY) > 8) { height = candidateHeight; changedHeight = true; }
         card.style.gridColumn = `span ${span}`;
-        if (changedHeight) card.style.minHeight = `${height}px`;
+        if (changedHeight) { card.style.height = `${height}px`; card.classList.add("has-custom-height"); }
       };
       const finish = async () => {
         window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", finish); window.removeEventListener("pointercancel", finish);
@@ -717,7 +717,7 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
   }
   getWidgetHeight(id) {
     const height = Number(this.getDashboard().heights?.[id]);
-    return Number.isFinite(height) && height >= 160 && height <= 820 ? height : 0;
+    return Number.isFinite(height) && height >= 140 && height <= 820 ? height : 0;
   }
   async setWidgetSize(id, size) {
     const dashboard = this.getDashboard();
@@ -730,7 +730,7 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     if (!dashboard.sizes || typeof dashboard.sizes !== "object") dashboard.sizes = {};
     if (!dashboard.heights || typeof dashboard.heights !== "object") dashboard.heights = {};
     dashboard.sizes[id] = `span-${Math.max(4, Math.min(12, Math.round(span)))}`;
-    if (Number.isFinite(height) && height >= 160) dashboard.heights[id] = Math.min(820, Math.round(height));
+    if (Number.isFinite(height) && height >= 140) dashboard.heights[id] = Math.min(820, Math.round(height));
     await this.saveVaultData(); await this.refreshViews();
   }
   async cycleWidgetSize(id) {
@@ -793,7 +793,9 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
       element.dataset.size = this.getWidgetSize(id);
       element.style.gridColumn = desktop ? `span ${this.getWidgetSpan(id)}` : "";
       const height = this.getWidgetHeight(id);
-      element.style.minHeight = desktop && height ? `${height}px` : "";
+      element.style.minHeight = "";
+      element.style.height = desktop && height ? `${height}px` : "";
+      element.classList.toggle("has-custom-height", desktop && Boolean(height));
       const heading = element.querySelector(".lp-heading");
       if (!heading) return;
       const existingControls = [...heading.children].filter(child => child.tagName === "BUTTON");
