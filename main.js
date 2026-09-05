@@ -517,9 +517,9 @@ class LaunchpadView extends ItemView {
     let draggedId = "";
     const cards = [...this.contentEl.querySelectorAll(".lp-card[data-widget]")];
     const clearDragState = () => cards.forEach(card => card.classList.remove("is-dragging", "is-drop-target"));
-    this.contentEl.querySelectorAll("[data-drag-handle]").forEach(handle => {
+    this.contentEl.querySelectorAll("[data-drag-strip]").forEach(handle => {
       handle.addEventListener("dragstart", event => {
-        draggedId = handle.dataset.dragHandle;
+        draggedId = handle.dataset.dragStrip;
         if (event.dataTransfer) {
           event.dataTransfer.setData("text/plain", draggedId);
           event.dataTransfer.effectAllowed = "move";
@@ -808,13 +808,13 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
       existingControls.forEach(button => tools.appendChild(button));
       const resize = tools.createEl("button", { text: "↔", cls: "lp-layout-button", attr: { "data-resize-widget": id, "aria-label": "改变卡片尺寸", title: "改变卡片尺寸" } });
       resize.type = "button";
-      const drag = tools.createEl("button", { text: "⠿", cls: "lp-drag-handle", attr: { "data-drag-handle": id, "aria-label": "拖动卡片排序", title: "拖动卡片排序", draggable: "true" } });
-      drag.type = "button";
       if (desktop && height) {
         const contentChildren = [...element.children].filter(child => child !== heading);
         const scrollBody = element.createDiv({ cls: "lp-card-scroll" });
         contentChildren.forEach(child => scrollBody.appendChild(child));
       }
+      const dragStrip = element.createEl("button", { cls: "lp-card-drag-strip", attr: { "data-drag-strip": id, "aria-label": "拖动重新摆放卡片", title: "按住横条拖动摆放卡片", draggable: "true" } });
+      dragStrip.type = "button";
       const corner = element.createEl("button", { cls: "lp-card-resize-handle", attr: { "data-card-resize": id, "aria-label": "拖动右下角调整卡片宽高", title: "拖动调整宽高。按 Enter 可切换宽度" } });
       corner.type = "button";
     });
