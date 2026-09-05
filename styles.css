@@ -60,7 +60,7 @@
 .lp-dashboard-toolbar button { min-height: 32px; border: 1px solid var(--lp-edge); border-radius: 9px; padding: 6px 10px; color: var(--lp-accent); background: var(--lp-surface); font-size: 12px; font-weight: 700; }
 .lp-dashboard-toolbar button:hover { border-color: var(--lp-accent); background: var(--lp-accent-soft); }
 .lp-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
-.lp-card { min-width: 0; padding: 17px; border: 1px solid var(--lp-edge); border-radius: 16px; background: var(--lp-surface); box-shadow: 0 1px 2px rgba(19,44,33,.04); transition: border-color .16s ease, box-shadow .16s ease; }
+.lp-card { position: relative; min-width: 0; padding: 17px; border: 1px solid var(--lp-edge); border-radius: 16px; background: var(--lp-surface); box-shadow: 0 1px 2px rgba(19,44,33,.04); transition: border-color .16s ease, box-shadow .16s ease; }
 .lp-card:hover { border-color: color-mix(in srgb, var(--lp-accent) 36%, var(--lp-edge)); box-shadow: 0 7px 18px rgba(19,44,33,.06); }
 .lp-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 13px; font-size: 14px; font-weight: 750; letter-spacing: -.01em; }
 .lp-heading > span:first-child { display: flex; align-items: center; gap: 6px; }
@@ -193,3 +193,11 @@
 .lp-inbox-list p { margin: 0; color: var(--lp-muted); font-size: 12px; line-height: 1.55; }
 @media (max-width: 800px) { .lp-inbox-card { grid-column: span 2; } }
 @media (max-width: 540px) { .lp-inbox-list > div { grid-template-columns: auto minmax(0,1fr) auto; } .lp-inbox-list small { grid-column: 2; } .lp-inbox-list button { grid-row: 2; } }
+/* 桌面端尺寸手柄：拖住右下角可按网格调整宽度，也可调整卡片高度。 */
+.lp-card-resize-handle { position: absolute; right: 0; bottom: 0; width: 29px; height: 29px; border: 0; border-radius: 0 0 16px 0; padding: 0; color: var(--lp-accent); background: transparent; cursor: nwse-resize; touch-action: none; }
+.lp-card-resize-handle::before { content: ""; position: absolute; right: 7px; bottom: 7px; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; opacity: .5; }
+.lp-card-resize-handle:hover::before,.lp-card-resize-handle:focus-visible::before { opacity: 1; }
+.lp-card-resize-handle:focus-visible { outline: 2px solid var(--lp-accent); outline-offset: -4px; }
+.lp-card.is-resizing { border-color: var(--lp-accent); box-shadow: 0 7px 18px rgba(19,44,33,.10); user-select: none; }
+@media (min-width: 801px) { .lp-layout-button { display: none; } }
+@media (max-width: 800px) { .lp-card-resize-handle { display: none; } .lp-layout-button { display: grid; } }

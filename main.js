@@ -94,7 +94,7 @@ function escapeHtml(text) {
   return String(text || "").replace(/[&<>'\"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[c]));
 }
 function defaultTasks(phase) { return Array.isArray(phase && phase.tasks) ? phase.tasks : ["明确今天的一件重点", "完成一个最小动作", "记录一条闪念", "安排一点恢复时间"]; }
-function defaultDashboard() { return { order: [...DEFAULT_WIDGETS], hidden: [], sizes: {}, customWidgets: [] }; }
+function defaultDashboard() { return { order: [...DEFAULT_WIDGETS], hidden: [], sizes: {}, heights: {}, customWidgets: [] }; }
 function freshData() {
   return {
     version: 8,
@@ -322,14 +322,14 @@ class DashboardLayoutModal extends Modal {
   render() {
     const { contentEl } = this, dashboard = this.plugin.getDashboard();
     contentEl.empty(); contentEl.createEl("h2", { text: "定制主页" });
-    contentEl.createEl("p", { text: "电脑端可直接拖动卡片排序。这里适合在平板和手机上调整显示、顺序和尺寸；不会删除你的笔记或记录。" });
+    contentEl.createEl("p", { text: "电脑端可拖住卡片右下角调整宽高，也可直接拖动排序。这里适合在平板和手机上调整显示、顺序和尺寸；不会删除你的笔记或记录。" });
     for (const id of dashboard.order) {
       const custom = dashboard.customWidgets.find(widget => widget.id === id);
       const title = custom ? custom.title : WIDGET_NAMES[id];
       if (!title) continue;
       new Setting(contentEl).setName(title).setDesc(custom ? "自定义卡片" : "系统卡片")
         .addToggle(toggle => toggle.setValue(!dashboard.hidden.includes(id)).onChange(async visible => { await this.plugin.setWidgetVisibility(id, visible); this.onSave(); }))
-        .addDropdown(dropdown => dropdown.addOptions({ auto: "默认", compact: "紧凑", standard: "标准", wide: "宽幅", full: "全宽" }).setValue(this.plugin.getWidgetSize(id)).onChange(async size => { await this.plugin.setWidgetSize(id, size); this.onSave(); this.render(); }))
+        .addDropdown(dropdown => dropdown.addOptions({ auto: "默认", compact: "紧凑（4列）", standard: "标准（6列）", wide: "宽幅（8列）", full: "全宽（12列）", "span-5": "拖拽尺寸（5列）", "span-7": "拖拽尺寸（7列）", "span-9": "拖拽尺寸（9列）", "span-10": "拖拽尺寸（10列）", "span-11": "拖拽尺寸（11列）" }).setValue(this.plugin.getWidgetSize(id)).onChange(async size => { await this.plugin.setWidgetSize(id, size); this.onSave(); this.render(); }))
         .addExtraButton(button => button.setIcon("chevron-up").setTooltip("上移").onClick(async () => { await this.plugin.moveWidget(id, -1); this.onSave(); this.render(); }))
         .addExtraButton(button => button.setIcon("chevron-down").setTooltip("下移").onClick(async () => { await this.plugin.moveWidget(id, 1); this.onSave(); this.render(); }));
       if (custom) new Setting(contentEl).setName("移除「" + title + "」").setDesc("只移除这张卡片，不影响其它笔记。")
@@ -482,7 +482,33 @@ class LaunchpadView extends ItemView {
   }
   bindDashboardInteractions() {
     this.contentEl.querySelectorAll("[data-resize-widget]").forEach(button => button.addEventListener("click", () => this.plugin.cycleWidgetSize(button.dataset.resizeWidget)));
-    if (!window.matchMedia("(min-width: 801px)").matches) return;
+    const desktop = window.matchMedia("(min-width: 801px)").matches;
+    if (desktop) this.contentEl.querySelectorAll("[data-card-resize]").forEach(handle => handle.addEventListener("pointerdown", event => {
+      if (event.button !== 0) return;
+      const card = handle.closest(".lp-card[data-widget]"), grid = card?.closest(".lp-grid"), id = card?.dataset.widget;
+      if (!card || !grid || !id) return;
+      event.preventDefault(); event.stopPropagation();
+      const style = window.getComputedStyle(grid), gap = Number.parseFloat(style.columnGap) || 12;
+      const unit = (grid.getBoundingClientRect().width - gap * 11) / 12, startRect = card.getBoundingClientRect();
+      const startSpan = Math.max(4, Math.min(12, Math.round((startRect.width + gap) / (unit + gap))));
+      const startHeight = startRect.height, previousHeight = this.plugin.getWidgetHeight(id);
+      let span = startSpan, height = previousHeight || Math.round(startHeight), changedHeight = false;
+      card.classList.add("is-resizing");
+      const move = pointerEvent => {
+        span = Math.max(4, Math.min(12, Math.round((startRect.width + pointerEvent.clientX - event.clientX + gap) / (unit + gap))));
+        const candidateHeight = Math.max(160, Math.min(820, Math.round((startHeight + pointerEvent.clientY - event.clientY) / 20) * 20));
+        if (Math.abs(pointerEvent.clientY - event.clientY) > 8) { height = candidateHeight; changedHeight = true; }
+        card.style.gridColumn = `span ${span}`;
+        if (changedHeight) card.style.minHeight = `${height}px`;
+      };
+      const finish = async () => {
+        window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", finish); window.removeEventListener("pointercancel", finish);
+        card.classList.remove("is-resizing");
+        if (span !== startSpan || changedHeight) await this.plugin.setWidgetLayout(id, span, changedHeight ? height : previousHeight);
+      };
+      window.addEventListener("pointermove", move); window.addEventListener("pointerup", finish); window.addEventListener("pointercancel", finish);
+    }));
+    if (!desktop) return;
     let draggedId = "";
     const cards = [...this.contentEl.querySelectorAll(".lp-card[data-widget]")];
     const clearDragState = () => cards.forEach(card => card.classList.remove("is-dragging", "is-drop-target"));
@@ -583,6 +609,7 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     this.data.dashboard.hidden = Array.isArray(this.data.dashboard.hidden) ? this.data.dashboard.hidden : [];
     this.data.dashboard.customWidgets = Array.isArray(this.data.dashboard.customWidgets) ? this.data.dashboard.customWidgets : [];
     this.data.dashboard.sizes = this.data.dashboard.sizes && typeof this.data.dashboard.sizes === "object" ? this.data.dashboard.sizes : {};
+    this.data.dashboard.heights = this.data.dashboard.heights && typeof this.data.dashboard.heights === "object" ? this.data.dashboard.heights : {};
     for (const id of DEFAULT_WIDGETS) if (!this.data.dashboard.order.includes(id)) this.data.dashboard.order.push(id);
     if (!isNewInstall && rawData && typeof rawData.onboardingComplete !== "boolean") this.data.onboardingComplete = true;
     this.data.onboardingComplete = Boolean(this.data.onboardingComplete);
@@ -678,7 +705,19 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
   getDashboard() { return this.data.dashboard || defaultDashboard(); }
   getWidgetSize(id) {
     const size = this.getDashboard().sizes?.[id];
-    return ["compact", "standard", "wide", "full"].includes(size) ? size : "auto";
+    const normalized = { "span-4": "compact", "span-6": "standard", "span-8": "wide", "span-12": "full" }[size] || size;
+    return ["compact", "standard", "wide", "full"].includes(normalized) || /^span-(?:[5-7]|9|1[01])$/.test(normalized) ? normalized : "auto";
+  }
+  getWidgetSpan(id) {
+    const size = this.getWidgetSize(id), custom = /^span-(\d+)$/.exec(size);
+    if (custom) return Number(custom[1]);
+    const preset = { compact: 4, standard: 6, wide: 8, full: 12 }[size];
+    if (preset) return preset;
+    return { capture: 7, tasks: 7, shortcuts: 7, library: 7, week: 7, inbox: 5, focus: 5, growth: 5, health: 5, milestone: 5, recent: 5 }[id] || 5;
+  }
+  getWidgetHeight(id) {
+    const height = Number(this.getDashboard().heights?.[id]);
+    return Number.isFinite(height) && height >= 160 && height <= 820 ? height : 0;
   }
   async setWidgetSize(id, size) {
     const dashboard = this.getDashboard();
@@ -686,9 +725,18 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     if (size === "auto") delete dashboard.sizes[id]; else dashboard.sizes[id] = size;
     await this.saveVaultData(); await this.refreshViews();
   }
+  async setWidgetLayout(id, span, height) {
+    const dashboard = this.getDashboard();
+    if (!dashboard.sizes || typeof dashboard.sizes !== "object") dashboard.sizes = {};
+    if (!dashboard.heights || typeof dashboard.heights !== "object") dashboard.heights = {};
+    dashboard.sizes[id] = `span-${Math.max(4, Math.min(12, Math.round(span)))}`;
+    if (Number.isFinite(height) && height >= 160) dashboard.heights[id] = Math.min(820, Math.round(height));
+    await this.saveVaultData(); await this.refreshViews();
+  }
   async cycleWidgetSize(id) {
     const sizes = ["auto", "compact", "standard", "wide", "full"];
-    const next = sizes[(sizes.indexOf(this.getWidgetSize(id)) + 1) % sizes.length];
+    const current = sizes.includes(this.getWidgetSize(id)) ? this.getWidgetSize(id) : "auto";
+    const next = sizes[(sizes.indexOf(current) + 1) % sizes.length];
     await this.setWidgetSize(id, next);
     new Notice(`「${WIDGET_NAMES[id] || "卡片"}」尺寸：${{ auto: "默认", compact: "紧凑", standard: "标准", wide: "宽幅", full: "全宽" }[next]}`);
   }
@@ -723,6 +771,7 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     dashboard.order = dashboard.order.filter(item => item !== id);
     dashboard.hidden = dashboard.hidden.filter(item => item !== id);
     if (dashboard.sizes) delete dashboard.sizes[id];
+    if (dashboard.heights) delete dashboard.heights[id];
     await this.saveVaultData(); await this.refreshViews();
   }
   renderCustomWidgets() {
@@ -736,12 +785,15 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     }).join("");
   }
   applyDashboardLayout(root) {
-    const dashboard = this.getDashboard();
+    const dashboard = this.getDashboard(), desktop = window.matchMedia("(min-width: 801px)").matches;
     root.querySelectorAll("[data-widget]").forEach(element => {
       const id = element.dataset.widget, index = dashboard.order.indexOf(id);
       if (dashboard.hidden.includes(id) || index < 0) { element.remove(); return; }
       element.style.order = String(index);
       element.dataset.size = this.getWidgetSize(id);
+      element.style.gridColumn = desktop ? `span ${this.getWidgetSpan(id)}` : "";
+      const height = this.getWidgetHeight(id);
+      element.style.minHeight = desktop && height ? `${height}px` : "";
       const heading = element.querySelector(".lp-heading");
       if (!heading) return;
       const existingControls = [...heading.children].filter(child => child.tagName === "BUTTON");
@@ -751,6 +803,8 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
       resize.type = "button";
       const drag = tools.createEl("button", { text: "⠿", cls: "lp-drag-handle", attr: { "data-drag-handle": id, "aria-label": "拖动卡片排序", title: "拖动卡片排序", draggable: "true" } });
       drag.type = "button";
+      const corner = element.createEl("button", { cls: "lp-card-resize-handle", attr: { "data-card-resize": id, "aria-label": "拖动右下角调整卡片宽高", title: "拖动右下角调整卡片宽高" } });
+      corner.type = "button";
     });
   }
   updateCustomCounter(id) {
