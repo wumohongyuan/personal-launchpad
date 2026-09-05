@@ -194,10 +194,9 @@
 @media (max-width: 800px) { .lp-inbox-card { grid-column: span 2; } }
 @media (max-width: 540px) { .lp-inbox-list > div { grid-template-columns: auto minmax(0,1fr) auto; } .lp-inbox-list small { grid-column: 2; } .lp-inbox-list button { grid-row: 2; } }
 /* 桌面端尺寸手柄：拖住右下角可按网格调整宽度，也可调整卡片高度。 */
-.lp-card-resize-handle { position: absolute; right: 0; bottom: 0; width: 36px; height: 36px; border: 0; border-radius: 0 0 16px 0; padding: 0; color: var(--lp-accent); background: transparent; cursor: nwse-resize; opacity: 0; touch-action: none; transition: opacity .14s ease; }
-.lp-card-resize-handle::before { content: ""; position: absolute; right: 8px; bottom: 8px; width: 13px; height: 13px; background: linear-gradient(135deg, transparent 45%, currentColor 46% 53%, transparent 54%) 0 8px / 8px 8px no-repeat, linear-gradient(135deg, transparent 45%, currentColor 46% 53%, transparent 54%) 4px 4px / 8px 8px no-repeat, linear-gradient(135deg, transparent 45%, currentColor 46% 53%, transparent 54%) 8px 0 / 8px 8px no-repeat; opacity: .52; }
-.lp-card:hover .lp-card-resize-handle,.lp-card-resize-handle:focus-visible,.lp-card.is-resizing .lp-card-resize-handle { opacity: 1; }
-.lp-card-resize-handle:hover::before,.lp-card-resize-handle:focus-visible::before { opacity: 1; }
+.lp-card-resize-handle { position: absolute; right: 0; bottom: 0; width: 32px; height: 32px; border: 0; border-radius: 0 0 16px 0; padding: 0; color: var(--lp-accent); background: transparent; cursor: nwse-resize; touch-action: none; }
+.lp-card-resize-handle::before { content: ""; position: absolute; right: 5px; bottom: 5px; width: 10px; height: 10px; border-radius: 0 0 7px 0; background: color-mix(in srgb, var(--lp-accent) 34%, transparent); clip-path: polygon(100% 0, 100% 100%, 0 100%); transition: background .14s ease, transform .14s ease; }
+.lp-card-resize-handle:hover::before,.lp-card-resize-handle:focus-visible::before,.lp-card.is-resizing .lp-card-resize-handle::before { background: color-mix(in srgb, var(--lp-accent) 78%, transparent); transform: scale(1.12); }
 .lp-card-resize-handle:focus-visible { outline: 2px solid var(--lp-accent); outline-offset: -5px; }
 .lp-card.has-custom-height { overflow: auto; }
 .lp-card.is-resizing { border-color: var(--lp-accent); box-shadow: 0 7px 18px rgba(19,44,33,.10); user-select: none; }
