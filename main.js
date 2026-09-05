@@ -83,7 +83,7 @@ function escapeHtml(text) {
   return String(text || "").replace(/[&<>'\"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[c]));
 }
 function defaultTasks(phase) { return Array.isArray(phase && phase.tasks) ? phase.tasks : ["明确今天的一件重点", "完成一个最小动作", "记录一条闪念", "安排一点恢复时间"]; }
-function defaultDashboard() { return { order: [...DEFAULT_WIDGETS], hidden: [], customWidgets: [] }; }
+function defaultDashboard() { return { order: [...DEFAULT_WIDGETS], hidden: [], sizes: {}, customWidgets: [] }; }
 function freshData() {
   return {
     version: 5,
@@ -244,22 +244,23 @@ class DashboardLayoutModal extends Modal {
   render() {
     const { contentEl } = this, dashboard = this.plugin.getDashboard();
     contentEl.empty(); contentEl.createEl("h2", { text: "定制主页" });
-    contentEl.createEl("p", { text: "开关控制是否显示；上下箭头调整顺序。移除卡片不会删除笔记或训练记录。" });
+    contentEl.createEl("p", { text: "电脑端可直接拖动卡片排序。这里适合在平板和手机上调整显示、顺序和尺寸；不会删除你的笔记或记录。" });
     for (const id of dashboard.order) {
       const custom = dashboard.customWidgets.find(widget => widget.id === id);
       const title = custom ? custom.title : WIDGET_NAMES[id];
       if (!title) continue;
       new Setting(contentEl).setName(title).setDesc(custom ? "自定义卡片" : "系统卡片")
         .addToggle(toggle => toggle.setValue(!dashboard.hidden.includes(id)).onChange(async visible => { await this.plugin.setWidgetVisibility(id, visible); this.onSave(); }))
+        .addDropdown(dropdown => dropdown.addOptions({ auto: "默认", compact: "紧凑", standard: "标准", wide: "宽幅", full: "全宽" }).setValue(this.plugin.getWidgetSize(id)).onChange(async size => { await this.plugin.setWidgetSize(id, size); this.onSave(); this.render(); }))
         .addExtraButton(button => button.setIcon("chevron-up").setTooltip("上移").onClick(async () => { await this.plugin.moveWidget(id, -1); this.onSave(); this.render(); }))
         .addExtraButton(button => button.setIcon("chevron-down").setTooltip("下移").onClick(async () => { await this.plugin.moveWidget(id, 1); this.onSave(); this.render(); }));
       if (custom) new Setting(contentEl).setName("移除「" + title + "」").setDesc("只移除这张卡片，不影响其它笔记。")
         .addButton(button => button.setButtonText("移除").setWarning().onClick(async () => { await this.plugin.removeCustomWidget(id); this.onSave(); this.render(); }));
     }
-    new Setting(contentEl).setName("新卡片").setDesc("可以添加文本、链接入口或目标计数器。").addButton(button => button.setButtonText("添加自定义卡片").setCta().onClick(() => new CustomWidgetModal(this.app, this.plugin, () => { this.onSave(); this.render(); }).open()));
+    new Setting(contentEl).setName("新卡片").setDesc("可以添加文本、链接入口或目标计数器。")
+      .addButton(button => button.setButtonText("添加自定义卡片").setCta().onClick(() => new CustomWidgetModal(this.app, this.plugin, () => { this.onSave(); this.render(); }).open()));
   }
 }
-
 class LaunchpadView extends ItemView {
   constructor(leaf, plugin) { super(leaf); this.plugin = plugin; }
   getViewType() { return VIEW_TYPE; }
@@ -393,6 +394,36 @@ class LaunchpadView extends ItemView {
     this.contentEl.querySelectorAll("[data-delete-widget]").forEach(button => button.addEventListener("click", async () => { await this.plugin.removeCustomWidget(button.dataset.deleteWidget); new Notice("卡片已移除"); await this.render(); }));
     this.contentEl.querySelectorAll("[data-open-widget-link]").forEach(button => button.addEventListener("click", () => window.open(button.dataset.openWidgetLink, "_blank", "noopener")));
     this.contentEl.querySelectorAll("[data-update-counter]").forEach(button => button.addEventListener("click", () => this.plugin.updateCustomCounter(button.dataset.updateCounter)));
+    this.bindDashboardInteractions();
+  }
+  bindDashboardInteractions() {
+    this.contentEl.querySelectorAll("[data-resize-widget]").forEach(button => button.addEventListener("click", () => this.plugin.cycleWidgetSize(button.dataset.resizeWidget)));
+    if (!window.matchMedia("(min-width: 801px)").matches) return;
+    let draggedId = "";
+    const cards = [...this.contentEl.querySelectorAll(".lp-card[data-widget]")];
+    const clearDragState = () => cards.forEach(card => card.classList.remove("is-dragging", "is-drop-target"));
+    this.contentEl.querySelectorAll("[data-drag-handle]").forEach(handle => {
+      handle.addEventListener("dragstart", event => {
+        draggedId = handle.dataset.dragHandle;
+        if (event.dataTransfer) {
+          event.dataTransfer.setData("text/plain", draggedId);
+          event.dataTransfer.effectAllowed = "move";
+        }
+        handle.closest("[data-widget]")?.classList.add("is-dragging");
+      });
+      handle.addEventListener("dragend", () => { draggedId = ""; clearDragState(); });
+    });
+    cards.forEach(card => {
+      card.addEventListener("dragover", event => { if (draggedId && card.dataset.widget !== draggedId) { event.preventDefault(); card.classList.add("is-drop-target"); } });
+      card.addEventListener("dragleave", () => card.classList.remove("is-drop-target"));
+      card.addEventListener("drop", async event => {
+        event.preventDefault();
+        const targetId = card.dataset.widget;
+        clearDragState();
+        if (draggedId && targetId) await this.plugin.moveWidgetBefore(draggedId, targetId);
+        draggedId = "";
+      });
+    });
   }
   async handleAction(action) {
     if (action === "edit-banner") return new BannerModal(this.app, this.plugin, () => this.render()).open();
@@ -464,6 +495,7 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     this.data.dashboard.order = Array.isArray(this.data.dashboard.order) ? this.data.dashboard.order : [...DEFAULT_WIDGETS];
     this.data.dashboard.hidden = Array.isArray(this.data.dashboard.hidden) ? this.data.dashboard.hidden : [];
     this.data.dashboard.customWidgets = Array.isArray(this.data.dashboard.customWidgets) ? this.data.dashboard.customWidgets : [];
+    this.data.dashboard.sizes = this.data.dashboard.sizes && typeof this.data.dashboard.sizes === "object" ? this.data.dashboard.sizes : {};
     for (const id of DEFAULT_WIDGETS) if (!this.data.dashboard.order.includes(id)) this.data.dashboard.order.push(id);
     this.data.version = 5;
   }
@@ -504,6 +536,30 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     }).open();
   }
   getDashboard() { return this.data.dashboard || defaultDashboard(); }
+  getWidgetSize(id) {
+    const size = this.getDashboard().sizes?.[id];
+    return ["compact", "standard", "wide", "full"].includes(size) ? size : "auto";
+  }
+  async setWidgetSize(id, size) {
+    const dashboard = this.getDashboard();
+    if (!dashboard.sizes || typeof dashboard.sizes !== "object") dashboard.sizes = {};
+    if (size === "auto") delete dashboard.sizes[id]; else dashboard.sizes[id] = size;
+    await this.saveVaultData(); await this.refreshViews();
+  }
+  async cycleWidgetSize(id) {
+    const sizes = ["auto", "compact", "standard", "wide", "full"];
+    const next = sizes[(sizes.indexOf(this.getWidgetSize(id)) + 1) % sizes.length];
+    await this.setWidgetSize(id, next);
+    new Notice(`「${WIDGET_NAMES[id] || "卡片"}」尺寸：${{ auto: "默认", compact: "紧凑", standard: "标准", wide: "宽幅", full: "全宽" }[next]}`);
+  }
+  async moveWidgetBefore(id, targetId) {
+    if (!id || id === targetId) return;
+    const order = this.getDashboard().order, from = order.indexOf(id), target = order.indexOf(targetId);
+    if (from < 0 || target < 0) return;
+    order.splice(from, 1);
+    order.splice(order.indexOf(targetId), 0, id);
+    await this.saveVaultData(); await this.refreshViews();
+  }
   async setWidgetVisibility(id, visible) {
     const dashboard = this.getDashboard();
     dashboard.hidden = visible ? dashboard.hidden.filter(item => item !== id) : [...new Set([...dashboard.hidden, id])];
@@ -526,6 +582,7 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     dashboard.customWidgets = dashboard.customWidgets.filter(widget => widget.id !== id);
     dashboard.order = dashboard.order.filter(item => item !== id);
     dashboard.hidden = dashboard.hidden.filter(item => item !== id);
+    if (dashboard.sizes) delete dashboard.sizes[id];
     await this.saveVaultData(); await this.refreshViews();
   }
   renderCustomWidgets() {
@@ -542,8 +599,18 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     const dashboard = this.getDashboard();
     root.querySelectorAll("[data-widget]").forEach(element => {
       const id = element.dataset.widget, index = dashboard.order.indexOf(id);
-      if (dashboard.hidden.includes(id) || index < 0) element.remove();
-      else element.style.order = String(index);
+      if (dashboard.hidden.includes(id) || index < 0) { element.remove(); return; }
+      element.style.order = String(index);
+      element.dataset.size = this.getWidgetSize(id);
+      const heading = element.querySelector(".lp-heading");
+      if (!heading) return;
+      const existingControls = [...heading.children].filter(child => child.tagName === "BUTTON");
+      const tools = heading.createEl("span", { cls: "lp-layout-tools" });
+      existingControls.forEach(button => tools.appendChild(button));
+      const resize = tools.createEl("button", { text: "↔", cls: "lp-layout-button", attr: { "data-resize-widget": id, "aria-label": "改变卡片尺寸", title: "改变卡片尺寸" } });
+      resize.type = "button";
+      const drag = tools.createEl("button", { text: "⠿", cls: "lp-drag-handle", attr: { "data-drag-handle": id, "aria-label": "拖动卡片排序", title: "拖动卡片排序", draggable: "true" } });
+      drag.type = "button";
     });
   }
   updateCustomCounter(id) {

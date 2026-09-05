@@ -162,3 +162,23 @@
 @media (prefers-reduced-motion: reduce) {
   .personal-launchpad *, .personal-launchpad *::before, .personal-launchpad *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+/* 主页布局控制：尺寸按网格档位变化，手机统一为单列。 */
+.lp-layout-tools { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; }
+.lp-layout-button,.lp-drag-handle { display: grid; place-items: center; width: 27px; height: 27px; border: 0; border-radius: 7px; padding: 0; color: var(--lp-muted); background: transparent; font-size: 14px; line-height: 1; }
+.lp-layout-button:hover,.lp-drag-handle:hover { color: var(--lp-accent); background: var(--lp-accent-soft); }
+.lp-layout-button:active { transform: scale(.96); }
+.lp-drag-handle { cursor: grab; font-size: 17px; }
+.lp-drag-handle:active { cursor: grabbing; }
+.lp-card.is-dragging { opacity: .46; }
+.lp-card.is-drop-target { outline: 2px solid var(--lp-accent); outline-offset: 2px; }
+@media (min-width: 801px) {
+  .lp-grid > .lp-card[data-size="compact"] { grid-column: span 4; }
+  .lp-grid > .lp-card[data-size="standard"] { grid-column: span 6; }
+  .lp-grid > .lp-card[data-size="wide"] { grid-column: span 8; }
+  .lp-grid > .lp-card[data-size="full"] { grid-column: 1 / -1; }
+}
+@media (min-width: 541px) and (max-width: 800px) {
+  .lp-grid > .lp-card[data-size="compact"],.lp-grid > .lp-card[data-size="standard"] { grid-column: span 1; }
+  .lp-grid > .lp-card[data-size="wide"],.lp-grid > .lp-card[data-size="full"] { grid-column: span 2; }
+}
+@media (max-width: 800px) { .lp-drag-handle { display: none; } }
