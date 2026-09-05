@@ -182,3 +182,14 @@
   .lp-grid > .lp-card[data-size="wide"],.lp-grid > .lp-card[data-size="full"] { grid-column: span 2; }
 }
 @media (max-width: 800px) { .lp-drag-handle { display: none; } }
+.lp-inbox-card { grid-column: span 5; }
+.lp-inbox-list { display: grid; gap: 8px; }
+.lp-inbox-list > div { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 7px; padding: 8px; border-radius: 9px; background: var(--lp-surface-soft); }
+.lp-inbox-list b { padding: 2px 5px; border-radius: 5px; color: var(--lp-accent); background: var(--lp-accent-soft); font-size: 10px; font-weight: 700; }
+.lp-inbox-list span { overflow: hidden; min-width: 0; color: var(--lp-ink); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.lp-inbox-list small { color: var(--lp-muted); font-size: 10px; white-space: nowrap; }
+.lp-inbox-list button { min-height: 27px; border: 0; border-radius: 6px; padding: 4px 7px; color: var(--lp-accent); background: var(--lp-accent-soft); font-size: 11px; }
+.lp-inbox-list button:last-child { color: var(--lp-muted); background: transparent; }
+.lp-inbox-list p { margin: 0; color: var(--lp-muted); font-size: 12px; line-height: 1.55; }
+@media (max-width: 800px) { .lp-inbox-card { grid-column: span 2; } }
+@media (max-width: 540px) { .lp-inbox-list > div { grid-template-columns: auto minmax(0,1fr) auto; } .lp-inbox-list small { grid-column: 2; } .lp-inbox-list button { grid-row: 2; } }

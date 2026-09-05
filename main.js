@@ -3,8 +3,9 @@ const { Plugin, ItemView, Modal, Setting, Notice, TFile } = require("obsidian");
 const VIEW_TYPE = "personal-launchpad-view";
 const DATA_FOLDER = "个人成长系统/配置";
 const DATA_PATH = `${DATA_FOLDER}/launchpad.json`;
-const DEFAULT_WIDGETS = ["capture", "focus", "tasks", "growth", "health", "milestone", "week", "shortcuts", "library", "recent"];
-const WIDGET_NAMES = { capture: "闪念", focus: "今日重点", tasks: "今日行动", growth: "当前成长", health: "身体系统", milestone: "下一交付物", week: "本周复盘", shortcuts: "快捷入口", library: "在读书库", recent: "今日闪念" };
+const BACKUP_FOLDER = `${DATA_FOLDER}/备份`;
+const DEFAULT_WIDGETS = ["capture", "inbox", "focus", "tasks", "growth", "health", "milestone", "week", "shortcuts", "library", "recent"];
+const WIDGET_NAMES = { capture: "闪念", focus: "今日重点", tasks: "今日行动", growth: "当前成长", health: "身体系统", milestone: "下一交付物", week: "本周复盘", shortcuts: "快捷入口", library: "在读书库", recent: "今日闪念", inbox: "闪念收件箱" };
 
 const DAILY_MESSAGES = [
   { text: "行而不辍，未来可期。", source: "《荀子》" },
@@ -63,17 +64,27 @@ const PLAN_PRESETS = {
 };
 
 function buildCustomPlan(growth) {
-  const days = Math.min(1095, Math.max(7, Number(growth.totalDays) || 28));
-  const weeks = Math.max(1, Math.ceil(days / 7));
-  const midpoint = Math.min(weeks, Math.max(2, Math.ceil(weeks / 2)));
-  return {
-    id: "custom", name: String(growth.planName || "我的行动计划").trim() || "我的行动计划", days,
-    goal: String(growth.goal || "围绕一个重要方向，持续做小而明确的行动").trim(),
-    phases: [{ id: "custom", name: "推进期", from: 1, to: weeks, goal: String(growth.goal || "围绕一个重要方向，持续做小而明确的行动").trim(), healthFocus: "按自己的节奏安排活动、睡眠和恢复。", tasks: ["推进今天最重要的事", "完成一个最小动作", "记录一条观察或闪念", "安排恢复或整理"] }],
-    milestones: [{ id: "week-1", week: 1, title: "计划起点", template: "## 我想完成什么\n\n## 为什么重要\n\n## 本周最小行动\n\n## 我会如何开始" }, { id: `week-${midpoint}`, week: midpoint, title: "中途回顾", template: "## 已经推进了什么\n\n## 遇到的阻力\n\n## 接下来要调整什么" }, { id: `week-${weeks}`, week: weeks, title: "阶段总结", template: "## 我完成了什么\n\n## 最有效的做法\n\n## 下一步" }].filter((item, index, all) => all.findIndex(other => other.id === item.id) === index)
-  };
-}
-function getPlanForGrowth(growth) {
+  const requestedDays = Math.min(1095, Math.max(7, Number(growth.totalDays) || 28));
+  const saved = growth.customPlan || {};
+  const savedPhases = Array.isArray(saved.phases) ? saved.phases : [];
+  let cursor = 1;
+  const phases = savedPhases.map((phase, index) => {
+    const weeks = Math.min(52, Math.max(1, Number(phase.weeks) || 1));
+    const from = cursor, to = cursor + weeks - 1;
+    cursor = to + 1;
+    return { id: `custom-phase-${index + 1}`, name: String(phase.name || `阶段 ${index + 1}`).trim(), from, to, goal: String(phase.goal || growth.goal || "持续推进重要方向").trim(), healthFocus: String(phase.healthFocus || "按自己的节奏安排活动、睡眠和恢复。").trim(), tasks: Array.isArray(phase.tasks) && phase.tasks.length ? phase.tasks.map(task => String(task).trim()).filter(Boolean).slice(0, 6) : ["推进今天最重要的事", "完成一个最小动作", "记录一条观察或闪念", "安排恢复或整理"] };
+  });
+  if (!phases.length) phases.push({ id: "custom-phase-1", name: "推进期", from: 1, to: Math.ceil(requestedDays / 7), goal: String(growth.goal || "围绕一个重要方向，持续做小而明确的行动").trim(), healthFocus: "按自己的节奏安排活动、睡眠和恢复。", tasks: ["推进今天最重要的事", "完成一个最小动作", "记录一条观察或闪念", "安排恢复或整理"] });
+  const days = Math.max(requestedDays, phases[phases.length - 1].to * 7);
+  const totalWeeks = Math.ceil(days / 7);
+  const savedMilestones = Array.isArray(saved.milestones) ? saved.milestones : [];
+  const milestones = savedMilestones.map((item, index) => ({ id: `custom-week-${Math.min(totalWeeks, Math.max(1, Number(item.week) || 1))}-${index + 1}`, week: Math.min(totalWeeks, Math.max(1, Number(item.week) || 1)), title: String(item.title || `第 ${index + 1} 个交付物`).trim(), template: String(item.template || "## 本周成果\n\n## 我学到了什么\n\n## 下一步").trim() })).filter(item => item.title);
+  if (!milestones.length) {
+    const middle = Math.min(totalWeeks, Math.max(2, Math.ceil(totalWeeks / 2)));
+    milestones.push({ id: "custom-week-1", week: 1, title: "计划起点", template: "## 我想完成什么\n\n## 为什么重要\n\n## 本周最小行动\n\n## 我会如何开始" }, { id: `custom-week-${middle}`, week: middle, title: "中途回顾", template: "## 已经推进了什么\n\n## 遇到的阻力\n\n## 接下来要调整什么" }, { id: `custom-week-${totalWeeks}`, week: totalWeeks, title: "阶段总结", template: "## 我完成了什么\n\n## 最有效的做法\n\n## 下一步" });
+  }
+  return { id: "custom", name: String(growth.planName || "我的行动计划").trim() || "我的行动计划", days, goal: String(growth.goal || "围绕一个重要方向，持续做小而明确的行动").trim(), phases, milestones };
+}function getPlanForGrowth(growth) {
   if (growth.planId === "custom") return buildCustomPlan(growth);
   const preset = PLAN_PRESETS[growth.planId] || PLAN_PRESETS.balanced;
   return { ...preset, name: String(growth.planName || preset.name).trim() || preset.name, goal: String(growth.goal || preset.goal).trim() || preset.goal };
@@ -86,9 +97,9 @@ function defaultTasks(phase) { return Array.isArray(phase && phase.tasks) ? phas
 function defaultDashboard() { return { order: [...DEFAULT_WIDGETS], hidden: [], sizes: {}, customWidgets: [] }; }
 function freshData() {
   return {
-    version: 5,
+    version: 8,
     banner: { mode: "daily", customText: "今天也要向前一点点。", customSource: "给未来的自己", image: "" },
-    growth: { planId: "balanced", planName: "84 天行动计划", totalDays: 84, startDate: todayKey(), stage: "启动期", week: 1, goal: "建立可持续的行动、复盘与恢复节奏", externalFeedback: [], completedMilestones: [] },
+    growth: { planId: "balanced", planName: "84 天行动计划", totalDays: 84, startDate: todayKey(), stage: "启动期", week: 1, goal: "建立可持续的行动、复盘与恢复节奏", customPlan: null, externalFeedback: [], completedMilestones: [] },
     shortcuts: [
       { label: "今日日记", icon: "✍", action: "daily" },
       { label: "新建待办", icon: "＋", action: "task" },
@@ -152,6 +163,8 @@ class GrowthSettingsModal extends Modal {
       .addText(input => { daysInput = input; input.setValue(totalDays).setPlaceholder("例如：30").onChange(value => totalDays = value.trim()); });
     new Setting(contentEl).setName("计划开始日期").setDesc("插件根据该日期自动计算第几天和第几周。")
       .addText(input => input.setValue(startDate).setPlaceholder("YYYY-MM-DD").onChange(value => startDate = value.trim()));
+    new Setting(contentEl).setName("自定义阶段与交付物").setDesc("把当前计划转为可编辑的自定义模板。")
+      .addButton(button => button.setButtonText("编辑自定义模板").onClick(() => new CustomPlanModal(this.app, this.plugin, () => this.onSave()).open()));
     new Setting(contentEl).addButton(button => button.setButtonText("保存设置").setCta().onClick(async () => {
       if (!window.moment(startDate, "YYYY-MM-DD", true).isValid()) return new Notice("日期格式应为 YYYY-MM-DD");
       const preset = PLAN_PRESETS[planId] || PLAN_PRESETS.balanced;
@@ -167,7 +180,72 @@ class GrowthSettingsModal extends Modal {
       await this.plugin.saveVaultData(); await this.plugin.refreshViews(); this.onSave(); this.close();
     }));
   }
-}class TextInputModal extends Modal {
+}
+
+class CustomPlanModal extends Modal {
+  constructor(app, plugin, onSave) { super(app); this.plugin = plugin; this.onSave = onSave; }
+  onOpen() {
+    const { contentEl } = this, growth = this.plugin.data.growth, plan = this.plugin.getPlan(), saved = growth.customPlan || {};
+    contentEl.createEl("h2", { text: "自定义计划模板" });
+    contentEl.createEl("p", { text: "每行一个阶段：名称 | 周数 | 任务 1 / 任务 2。里程碑每行：周数 | 标题。保存后会使用自定义计划。" });
+    let name = growth.planName || plan.name, goal = growth.goal || plan.goal, days = String(growth.totalDays || plan.days);
+    let phases = (Array.isArray(saved.phases) && saved.phases.length ? saved.phases : plan.phases.map(phase => ({ name: phase.name, weeks: phase.to - phase.from + 1, tasks: phase.tasks }))).map(phase => `${phase.name} | ${phase.weeks || (phase.to - phase.from + 1)} | ${(phase.tasks || []).join(" / ")}`).join("\n");
+    let milestones = (Array.isArray(saved.milestones) && saved.milestones.length ? saved.milestones : plan.milestones).map(item => `${item.week} | ${item.title}`).join("\n");
+    new Setting(contentEl).setName("计划名称").addText(input => input.setValue(name).onChange(value => name = value));
+    new Setting(contentEl).setName("计划目标").addTextArea(input => input.setValue(goal).onChange(value => goal = value));
+    new Setting(contentEl).setName("计划天数").setDesc("会自动至少覆盖所有阶段。")
+      .addText(input => input.setValue(days).onChange(value => days = value));
+    new Setting(contentEl).setName("阶段").setDesc("最多保留 8 个阶段，每阶段至少 1 周。")
+      .addTextArea(input => input.setValue(phases).onChange(value => phases = value));
+    new Setting(contentEl).setName("交付物").setDesc("可留空，插件会自动生成起点、中期和总结。")
+      .addTextArea(input => input.setValue(milestones).onChange(value => milestones = value));
+    new Setting(contentEl).addButton(button => button.setButtonText("保存自定义模板").setCta().onClick(async () => {
+      const parsedPhases = phases.split(/\r?\n/).map(line => line.trim()).filter(Boolean).slice(0, 8).map(line => {
+        const [phaseName, weeks, taskText = ""] = line.split("|").map(part => part.trim());
+        return { name: phaseName, weeks: Math.min(52, Math.max(1, Number(weeks) || 1)), tasks: taskText.split("/").map(task => task.trim()).filter(Boolean).slice(0, 6) };
+      }).filter(phase => phase.name);
+      if (!parsedPhases.length) return new Notice("至少需要写一个阶段。");
+      const phaseWeeks = parsedPhases.reduce((sum, phase) => sum + phase.weeks, 0);
+      const totalDays = Math.max(7, Math.min(1095, Math.max(Number(days) || 28, phaseWeeks * 7)));
+      const totalWeeks = Math.ceil(totalDays / 7);
+      const parsedMilestones = milestones.split(/\r?\n/).map(line => line.trim()).filter(Boolean).slice(0, 16).map((line, index) => {
+        const [week, title] = line.split("|").map(part => part.trim());
+        return { week: Math.min(totalWeeks, Math.max(1, Number(week) || 1)), title, template: "## 本周成果\n\n## 我学到了什么\n\n## 下一步" , index };
+      }).filter(item => item.title);
+      growth.planId = "custom";
+      growth.planName = name.trim() || "我的行动计划";
+      growth.goal = goal.trim() || "围绕一个重要方向，持续做小而明确的行动";
+      growth.totalDays = totalDays;
+      growth.customPlan = { phases: parsedPhases, milestones: parsedMilestones };
+      growth.completedMilestones = [];
+      await this.plugin.saveVaultData(); await this.plugin.refreshViews(); this.onSave(); this.close();
+      new Notice("自定义计划模板已保存。");
+    }));
+  }
+}
+
+class OnboardingModal extends Modal {
+  constructor(app, plugin) { super(app); this.plugin = plugin; }
+  onOpen() {
+    const { contentEl } = this, growth = this.plugin.data.growth;
+    contentEl.createEl("h2", { text: "设置你的启动台" });
+    contentEl.createEl("p", { text: "先选择计划和要显示的模块。之后随时可以在“定制主页”和“行动计划设置”中修改。" });
+    let planId = "balanced", planName = "84 天行动计划", goal = "建立可持续的行动、复盘与恢复节奏";
+    let nameInput, goalInput;
+    const enabled = new Set(["capture", "inbox", "focus", "tasks", "growth", "week", "shortcuts"]);
+    new Setting(contentEl).setName("计划类型").addDropdown(dropdown => dropdown.addOptions({ balanced: "84 天行动计划", focus: "42 天专注计划", legacy180: "180 天个人成长计划", custom: "自定义周期" }).setValue(planId).onChange(value => { planId = value; const preset = PLAN_PRESETS[value]; if (preset) { planName = preset.name; goal = preset.goal; nameInput?.setValue(planName); goalInput?.setValue(goal); } }));
+    new Setting(contentEl).setName("计划名称").addText(input => { nameInput = input; input.setValue(planName).setPlaceholder("例如：我的秋季计划").onChange(value => planName = value); });
+    new Setting(contentEl).setName("计划目标").addTextArea(input => { goalInput = input; input.setValue(goal).setPlaceholder("例如：完成毕业设计第一版").onChange(value => goal = value); });
+    contentEl.createEl("h3", { text: "显示模块" });
+    for (const id of DEFAULT_WIDGETS) new Setting(contentEl).setName(WIDGET_NAMES[id]).addToggle(toggle => toggle.setValue(enabled.has(id)).onChange(value => value ? enabled.add(id) : enabled.delete(id)));
+    new Setting(contentEl).addButton(button => button.setButtonText("完成设置").setCta().onClick(async () => {
+      await this.plugin.completeOnboarding({ planId, planName, goal, enabled: [...enabled] });
+      this.close();
+    }));
+  }
+}
+
+class TextInputModal extends Modal {
   constructor(app, title, placeholder, initialValue, onSubmit) { super(app); this.title = title; this.placeholder = placeholder; this.initialValue = initialValue; this.onSubmit = onSubmit; }
   onOpen() {
     const { contentEl } = this;
@@ -293,7 +371,7 @@ class LaunchpadView extends ItemView {
   async render() {
     const root = this.contentEl;
     root.empty(); root.addClass("personal-launchpad");
-    const data = this.plugin.data, day = this.day(), books = data.books || [], growthState = this.plugin.getGrowthState(), weekly = this.plugin.weeklyStats(), health = this.plugin.healthStats();
+    const data = this.plugin.data, day = this.day(), books = data.books || [], growthState = this.plugin.getGrowthState(), weekly = this.plugin.weeklyStats(), health = this.plugin.healthStats(), inbox = this.plugin.getFlashInbox();
     const reading = books.filter(book => book.status === "在读");
     const custom = data.banner.mode === "custom";
     const message = custom ? { text: data.banner.customText, source: data.banner.customSource } : this.message();
@@ -316,7 +394,10 @@ class LaunchpadView extends ItemView {
           <textarea data-role="flash" placeholder="现在想到什么？"></textarea>
           <div class="lp-capture-footer"><select data-role="flash-type"><option>闪念</option><option>待办</option><option>复盘</option><option>外部反馈</option><option>项目</option><option>AI问题</option></select><button data-action="save-flash" class="lp-primary">保存闪念</button></div>
         </section>
-        <section class="lp-card lp-focus-card" data-widget="focus">
+        <section class="lp-card lp-inbox-card" data-widget="inbox">
+          <div class="lp-heading"><span>⌁ 闪念收件箱</span><small>${inbox.pending} 条待整理</small></div>
+          <div class="lp-inbox-list">${inbox.items.length ? inbox.items.slice(0, 4).map(item => `<div><b>${escapeHtml(item.entry.type || "闪念")}</b><span>${escapeHtml(item.entry.text)}</span><small>${item.date} ${escapeHtml(item.entry.time || "")}</small><button data-inbox-to-task="${item.date}|${item.index}">转任务</button><button data-inbox-archive="${item.date}|${item.index}">归档</button></div>`).join("") : "<p>捕捉到的闪念会集中在这里，之后再决定是否转为行动。</p>"}</div>
+        </section>        <section class="lp-card lp-focus-card" data-widget="focus">
           <div class="lp-heading"><span>◎ 今天最重要的一件事</span><button data-action="edit-focus" class="lp-icon-button">编辑</button></div>
           <div class="lp-focus-text">${escapeHtml(day.focus || "还没有写下。先给今天一个清晰的方向。")}</div>
         </section>
@@ -384,11 +465,14 @@ class LaunchpadView extends ItemView {
       new TextInputModal(this.app, "编辑任务", "任务内容", task.text, async text => { task.text = text; await this.plugin.saveVaultData(); await this.render(); }).open();
     }));
     this.contentEl.querySelectorAll("[data-flash-to-task]").forEach(button => button.addEventListener("click", async () => {
-      const flash = this.day().flashes[Number(button.dataset.flashToTask)]; if (!flash) return;
-      this.day().tasks.push({ text: flash.text, done: false }); flash.type = "待办（已加入行动）";
-      await this.plugin.saveVaultData(); new Notice("已加入今日行动"); await this.render();
+      await this.plugin.routeFlashToTask(todayKey(), Number(button.dataset.flashToTask)); await this.render();
     }));
-    this.contentEl.querySelectorAll("[data-action]").forEach(button => button.addEventListener("click", () => this.handleAction(button.dataset.action)));
+    this.contentEl.querySelectorAll("[data-inbox-to-task]").forEach(button => button.addEventListener("click", async () => {
+      const [date, index] = button.dataset.inboxToTask.split("|"); await this.plugin.routeFlashToTask(date, Number(index));
+    }));
+    this.contentEl.querySelectorAll("[data-inbox-archive]").forEach(button => button.addEventListener("click", async () => {
+      const [date, index] = button.dataset.inboxArchive.split("|"); await this.plugin.archiveFlash(date, Number(index));
+    }));    this.contentEl.querySelectorAll("[data-action]").forEach(button => button.addEventListener("click", () => this.handleAction(button.dataset.action)));
     this.contentEl.querySelectorAll("[data-shortcut]").forEach(button => button.addEventListener("click", () => this.plugin.runShortcut(this.plugin.data.shortcuts[Number(button.dataset.shortcut)])));
     this.contentEl.querySelectorAll("[data-book]").forEach(button => button.addEventListener("click", () => this.plugin.updateBook(Number(button.dataset.book))));
     this.contentEl.querySelectorAll("[data-delete-widget]").forEach(button => button.addEventListener("click", async () => { await this.plugin.removeCustomWidget(button.dataset.deleteWidget); new Notice("卡片已移除"); await this.render(); }));
@@ -464,6 +548,8 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     this.addCommand({ id: "open-personal-launchpad", name: "Open personal launchpad", callback: () => this.activateView() });
     this.addCommand({ id: "quick-capture", name: "Quick capture a flash", callback: () => this.openQuickCapture() });
     this.addCommand({ id: "quick-log-workout", name: "Quick log a workout", callback: () => this.recordWorkout() });
+    this.addCommand({ id: "configure-personal-launchpad", name: "Configure personal launchpad", callback: () => new OnboardingModal(this.app, this).open() });
+    if (!this.data.onboardingComplete) window.setTimeout(() => new OnboardingModal(this.app, this).open(), 350);
   }
   async onunload() { this.app.workspace.detachLeavesOfType(VIEW_TYPE); }
   async ensureFolder(path) {
@@ -473,10 +559,11 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
   async loadVaultData() {
     await this.ensureFolder(DATA_FOLDER);
     const file = this.app.vault.getAbstractFileByPath(DATA_PATH);
+    let rawData = null, isNewInstall = false;
     if (file instanceof TFile) {
-      try { this.data = { ...freshData(), ...JSON.parse(await this.app.vault.read(file)) }; }
-      catch (_) { this.data = freshData(); }
-    } else { this.data = freshData(); await this.saveVaultData(); }
+      try { rawData = JSON.parse(await this.app.vault.read(file)); this.data = { ...freshData(), ...rawData }; }
+      catch (_) { this.data = freshData(); this.data.onboardingComplete = true; new Notice("启动台配置无法读取，已保留原文件并使用临时默认设置。"); }
+    } else { isNewInstall = true; this.data = freshData(); await this.saveVaultData(); }
     this.data.books = Array.isArray(this.data.books) ? this.data.books : [];
     this.data.days = this.data.days && typeof this.data.days === "object" ? this.data.days : {};
     const storedGrowth = this.data.growth || {};
@@ -497,12 +584,20 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     this.data.dashboard.customWidgets = Array.isArray(this.data.dashboard.customWidgets) ? this.data.dashboard.customWidgets : [];
     this.data.dashboard.sizes = this.data.dashboard.sizes && typeof this.data.dashboard.sizes === "object" ? this.data.dashboard.sizes : {};
     for (const id of DEFAULT_WIDGETS) if (!this.data.dashboard.order.includes(id)) this.data.dashboard.order.push(id);
-    this.data.version = 5;
+    if (!isNewInstall && rawData && typeof rawData.onboardingComplete !== "boolean") this.data.onboardingComplete = true;
+    this.data.onboardingComplete = Boolean(this.data.onboardingComplete);
+    this.data.version = 8;
   }
   async saveVaultData() {
     const text = JSON.stringify(this.data, null, 2);
     const file = this.app.vault.getAbstractFileByPath(DATA_PATH);
-    if (file instanceof TFile) await this.app.vault.modify(file, text); else await this.app.vault.create(DATA_PATH, text);
+    if (file instanceof TFile) {
+      const backupPath = `${BACKUP_FOLDER}/launchpad-${todayKey()}.json`;
+      if (!(this.app.vault.getAbstractFileByPath(backupPath) instanceof TFile)) {
+        try { await this.ensureFolder(BACKUP_FOLDER); await this.app.vault.create(backupPath, await this.app.vault.read(file)); } catch (_) { /* 保存配置不能因备份失败中断 */ }
+      }
+      await this.app.vault.modify(file, text);
+    } else await this.app.vault.create(DATA_PATH, text);
   }
   async activateView() {
     const { workspace } = this.app; let leaf = workspace.getLeavesOfType(VIEW_TYPE)[0];
@@ -521,7 +616,7 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
     const day = this.data.days[key];
     day.tasks = Array.isArray(day.tasks) ? day.tasks : [];
     day.flashes = Array.isArray(day.flashes) ? day.flashes : [];
-    const entry = { text, type, time: window.moment().format("HH:mm") };
+    const entry = { text, type, time: window.moment().format("HH:mm"), status: "inbox" };
     day.flashes.push(entry); await this.ensureFolder("个人成长系统/闪念");
     const path = `个人成长系统/闪念/${key}.md`, block = `\n## ${entry.time} · ${entry.type}\n\n${text}\n\n- 类型：${entry.type}\n- 状态：待整理\n`;
     const file = this.app.vault.getAbstractFileByPath(path);
@@ -534,6 +629,51 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
       if (!this.data.days[key]) this.data.days[key] = { tasks: defaultTasks(this.getGrowthState().phase).map(value => ({ text: value, done: false })), flashes: [] };
       await this.saveFlash(text, "闪念"); new Notice("闪念已保存"); await this.refreshViews();
     }).open();
+  }
+  getFlashInbox() {
+    const items = [];
+    for (const [date, day] of Object.entries(this.data.days || {})) {
+      for (const [index, entry] of (Array.isArray(day.flashes) ? day.flashes : []).entries()) {
+        const status = entry.status || (String(entry.type || "").includes("已加入行动") ? "actioned" : "inbox");
+        if (status === "inbox") items.push({ date, index, entry });
+      }
+    }
+    items.sort((a, b) => `${b.date} ${b.entry.time || ""}`.localeCompare(`${a.date} ${a.entry.time || ""}`));
+    return { items, pending: items.length };
+  }
+  async routeFlashToTask(date, index) {
+    const sourceDay = this.data.days[date], flash = sourceDay?.flashes?.[index];
+    if (!flash) return new Notice("这条闪念已不存在。");
+    if (flash.status === "actioned") return new Notice("这条闪念已经转为行动。");
+    const key = todayKey();
+    if (!this.data.days[key]) this.data.days[key] = { tasks: defaultTasks(this.getGrowthState().phase).map(value => ({ text: value, done: false })), flashes: [] };
+    this.data.days[key].tasks = Array.isArray(this.data.days[key].tasks) ? this.data.days[key].tasks : [];
+    this.data.days[key].tasks.push({ text: flash.text, done: false, sourceFlash: `${date}|${index}` });
+    flash.status = "actioned";
+    await this.saveVaultData(); await this.refreshViews(); new Notice("已加入今日行动。");
+  }
+  async archiveFlash(date, index) {
+    const flash = this.data.days?.[date]?.flashes?.[index];
+    if (!flash) return new Notice("这条闪念已不存在。");
+    flash.status = "archived";
+    await this.saveVaultData(); await this.refreshViews(); new Notice("闪念已归档。");
+  }
+  async completeOnboarding({ planId, planName, goal, enabled }) {
+    const preset = PLAN_PRESETS[planId] || PLAN_PRESETS.balanced;
+    const isCustom = planId === "custom";
+    const growth = this.data.growth;
+    growth.planId = isCustom ? "custom" : planId;
+    growth.planName = planName.trim() || preset.name;
+    growth.goal = goal.trim() || preset.goal;
+    growth.totalDays = isCustom ? 28 : preset.days;
+    if (isCustom) growth.customPlan = null;
+    growth.startDate = todayKey();
+    growth.completedMilestones = [];
+    const dashboard = this.getDashboard();
+    dashboard.hidden = DEFAULT_WIDGETS.filter(id => !enabled.includes(id));
+    this.data.onboardingComplete = true;
+    await this.saveVaultData(); await this.refreshViews();
+    new Notice("启动台已按你的选择创建。");
   }
   getDashboard() { return this.data.dashboard || defaultDashboard(); }
   getWidgetSize(id) {
