@@ -56,9 +56,13 @@
 .lp-banner-settings { position: absolute; top: 16px; right: 16px; display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid rgba(255,255,255,.3); border-radius: 9px; color: #fff; background: rgba(0,0,0,.13); font-size: 16px; transition: background .16s ease, transform .16s ease; }
 .lp-banner-settings:hover { background: rgba(255,255,255,.16); transform: rotate(16deg); }
 
-.lp-dashboard-toolbar { display: flex; align-items: center; justify-content: space-between; margin: 21px 2px 10px; color: var(--lp-muted); font-size: 12px; font-weight: 700; letter-spacing: .05em; }
+.lp-dashboard-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 21px 2px 10px; color: var(--lp-muted); font-size: 12px; font-weight: 700; letter-spacing: .05em; }
 .lp-dashboard-toolbar button { min-height: 32px; border: 1px solid var(--lp-edge); border-radius: 9px; padding: 6px 10px; color: var(--lp-accent); background: var(--lp-surface); font-size: 12px; font-weight: 700; }
 .lp-dashboard-toolbar button:hover { border-color: var(--lp-accent); background: var(--lp-accent-soft); }
+.lp-dashboard-actions { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.lp-layout-restore { display: none; }
+.personal-launchpad.is-layout-editing .lp-layout-edit-toggle { color: var(--lp-surface); border-color: var(--lp-accent); background: var(--lp-accent); }
+.personal-launchpad.is-layout-editing .lp-layout-restore { display: inline-flex; }
 .lp-grid { position: relative; display: grid; grid-auto-flow: row; grid-auto-rows: 16px; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
 .lp-card { position: relative; z-index: 1; min-width: 0; min-height: 0; padding: 17px; border: 1px solid var(--lp-edge); border-radius: 16px; background: var(--lp-surface); box-shadow: 0 1px 2px rgba(19,44,33,.04); transition: border-color .16s ease, box-shadow .16s ease; }
 .lp-card:hover { border-color: color-mix(in srgb, var(--lp-accent) 36%, var(--lp-edge)); box-shadow: 0 7px 18px rgba(19,44,33,.06); }
@@ -167,9 +171,9 @@
 .lp-layout-button { display: grid; place-items: center; width: 27px; height: 27px; border: 0; border-radius: 7px; padding: 0; color: var(--lp-muted); background: transparent; font-size: 14px; line-height: 1; }
 .lp-layout-button:hover { color: var(--lp-accent); background: var(--lp-accent-soft); }
 .lp-layout-button:active { transform: scale(.96); }
-.lp-card-drag-strip { position: absolute; top: 7px; left: 50%; z-index: 2; width: 52px; height: 18px; appearance: none !important; -webkit-appearance: none; border: 0 !important; border-radius: 9px; padding: 0 !important; color: var(--lp-muted); background: transparent !important; box-shadow: none !important; cursor: grab; opacity: 0; transform: translateX(-50%); transition: opacity .14s ease, background .14s ease; }
+.lp-card-drag-strip { position: absolute; pointer-events: none; top: 7px; left: 50%; z-index: 2; width: 52px; height: 18px; appearance: none !important; -webkit-appearance: none; border: 0 !important; border-radius: 9px; padding: 0 !important; color: var(--lp-muted); background: transparent !important; box-shadow: none !important; cursor: grab; opacity: 0; transform: translateX(-50%); transition: opacity .14s ease, background .14s ease; }
 .lp-card-drag-strip::before { content: ""; display: block; width: 28px; height: 3px; margin: auto; border-radius: 99px; background: currentColor; opacity: .55; }
-.lp-card:hover .lp-card-drag-strip,.lp-card-drag-strip:focus-visible,.lp-card.is-dragging .lp-card-drag-strip { opacity: 1; }
+.personal-launchpad.is-layout-editing .lp-card-drag-strip,.lp-card-drag-strip:focus-visible,.lp-card.is-dragging .lp-card-drag-strip { opacity: 1; pointer-events: auto; }
 .lp-card-drag-strip:hover,.lp-card-drag-strip:focus-visible { color: var(--lp-accent); background: var(--lp-accent-soft) !important; }
 .lp-card-drag-strip:active { cursor: grabbing; }
 .lp-card.is-dragging { opacity: .68; }
@@ -198,8 +202,9 @@
 @media (max-width: 540px) { .lp-inbox-list > div { grid-template-columns: auto minmax(0,1fr) auto; } .lp-inbox-list small { grid-column: 2; } .lp-inbox-list button { grid-row: 2; } }
 /* 桌面端尺寸手柄：拖住右下角可按网格调整宽度，也可调整卡片高度。 */
 /* 热区与视觉角标分离：30px 仅用于鼠标命中，可见三角始终贴在边框内。 */
-.lp-card-resize-handle { position: absolute; right: -1px; bottom: -1px; width: 30px; height: 30px; appearance: none !important; -webkit-appearance: none; border: 0 !important; border-radius: 0 !important; padding: 0 !important; color: var(--lp-accent); background: transparent !important; box-shadow: none !important; cursor: nwse-resize; line-height: 1; touch-action: none; }
+.lp-card-resize-handle { position: absolute; opacity: 0; pointer-events: none; right: -1px; bottom: -1px; width: 30px; height: 30px; appearance: none !important; -webkit-appearance: none; border: 0 !important; border-radius: 0 !important; padding: 0 !important; color: var(--lp-accent); background: transparent !important; box-shadow: none !important; cursor: nwse-resize; line-height: 1; touch-action: none; }
 .lp-card-resize-handle::before { content: ""; position: absolute; right: 3px; bottom: 3px; width: 7px; height: 7px; background: color-mix(in srgb, var(--lp-accent) 42%, transparent); clip-path: polygon(100% 0, 100% 100%, 0 100%); transition: background .14s ease, transform .14s ease; }
+.personal-launchpad.is-layout-editing .lp-card-resize-handle { opacity: 1; pointer-events: auto; }
 .lp-card-resize-handle:hover::before,.lp-card-resize-handle:focus-visible::before,.lp-card.is-resizing .lp-card-resize-handle::before { background: color-mix(in srgb, var(--lp-accent) 86%, transparent); transform: scale(1.18); }
 .lp-card-resize-handle:focus-visible { outline: 2px solid var(--lp-accent); outline-offset: -4px; }
 .lp-card.has-custom-height { box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; }
@@ -209,4 +214,4 @@
 .lp-card.has-custom-height .lp-card-scroll > :last-child { margin-bottom: 0; }
 .lp-card.is-resizing { border-color: var(--lp-accent); box-shadow: 0 7px 18px rgba(19,44,33,.10); user-select: none; }
 @media (min-width: 801px) { .lp-layout-button { display: none; } }
-@media (max-width: 800px) { .lp-card-resize-handle { display: none; } .lp-layout-button { display: grid; } }
+@media (max-width: 800px) { .lp-layout-edit-toggle,.lp-layout-restore { display: none !important; } .lp-card-resize-handle { display: none; } .lp-layout-button { display: grid; } }
