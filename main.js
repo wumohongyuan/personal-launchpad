@@ -391,8 +391,8 @@ class LaunchpadView extends ItemView {
       <main class="lp-grid">
         <section class="lp-card lp-capture-card" data-widget="capture">
           <div class="lp-heading"><span>✦ 闪念</span><small>先捕捉，后整理</small></div>
-          <textarea data-role="flash" placeholder="现在想到什么？"></textarea>
-          <div class="lp-capture-footer"><select data-role="flash-type"><option>闪念</option><option>待办</option><option>复盘</option><option>外部反馈</option><option>项目</option><option>AI问题</option></select><button data-action="save-flash" class="lp-primary">保存闪念</button></div>
+          <textarea data-role="flash" aria-label="闪念内容" placeholder="现在想到什么？"></textarea>
+          <div class="lp-capture-footer"><select data-role="flash-type" aria-label="闪念类型"><option>闪念</option><option>待办</option><option>复盘</option><option>外部反馈</option><option>项目</option><option>AI问题</option></select><button data-action="save-flash" class="lp-primary">保存闪念</button></div>
         </section>
         <section class="lp-card lp-inbox-card" data-widget="inbox">
           <div class="lp-heading"><span>⌁ 闪念收件箱</span><small>${inbox.pending} 条待整理</small></div>
@@ -507,6 +507,11 @@ class LaunchpadView extends ItemView {
         if (span !== startSpan || changedHeight) await this.plugin.setWidgetLayout(id, span, changedHeight ? height : previousHeight);
       };
       window.addEventListener("pointermove", move); window.addEventListener("pointerup", finish); window.addEventListener("pointercancel", finish);
+    }));
+    if (desktop) this.contentEl.querySelectorAll("[data-card-resize]").forEach(handle => handle.addEventListener("keydown", event => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      this.plugin.cycleWidgetSize(handle.dataset.cardResize);
     }));
     if (!desktop) return;
     let draggedId = "";
@@ -805,7 +810,7 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
       resize.type = "button";
       const drag = tools.createEl("button", { text: "⠿", cls: "lp-drag-handle", attr: { "data-drag-handle": id, "aria-label": "拖动卡片排序", title: "拖动卡片排序", draggable: "true" } });
       drag.type = "button";
-      const corner = element.createEl("button", { cls: "lp-card-resize-handle", attr: { "data-card-resize": id, "aria-label": "拖动右下角调整卡片宽高", title: "拖动右下角调整卡片宽高" } });
+      const corner = element.createEl("button", { cls: "lp-card-resize-handle", attr: { "data-card-resize": id, "aria-label": "拖动右下角调整卡片宽高", title: "拖动调整宽高。按 Enter 可切换宽度" } });
       corner.type = "button";
     });
   }
