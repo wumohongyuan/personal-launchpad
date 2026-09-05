@@ -810,6 +810,11 @@ module.exports = class PersonalLaunchpadPlugin extends Plugin {
       resize.type = "button";
       const drag = tools.createEl("button", { text: "⠿", cls: "lp-drag-handle", attr: { "data-drag-handle": id, "aria-label": "拖动卡片排序", title: "拖动卡片排序", draggable: "true" } });
       drag.type = "button";
+      if (desktop && height) {
+        const contentChildren = [...element.children].filter(child => child !== heading);
+        const scrollBody = element.createDiv({ cls: "lp-card-scroll" });
+        contentChildren.forEach(child => scrollBody.appendChild(child));
+      }
       const corner = element.createEl("button", { cls: "lp-card-resize-handle", attr: { "data-card-resize": id, "aria-label": "拖动右下角调整卡片宽高", title: "拖动调整宽高。按 Enter 可切换宽度" } });
       corner.type = "button";
     });
