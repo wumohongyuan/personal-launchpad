@@ -45,7 +45,7 @@
   --interactive-accent-hover: #6854b8;
   color: var(--text-normal);
 }
-.hp-view .hp-root { --hp-radius: 11px; --hp-shadow: 0 2px 6px #0000000d; }
+.hp-view .hp-root { --hp-radius: var(--hp-custom-radius,11px); --hp-shadow: 0 2px 6px #0000000d; }
 .hp-view .hp-tab { border-radius: 7px; font-weight: 550; }
 .hp-view .hp-tab.is-active { box-shadow: none; }
 .hp-view .hp-tabs .hp-personal-quick-capture { margin-left: auto; color: var(--text-accent); }
@@ -56,7 +56,7 @@
 .hp-view[data-hp-appearance="dark"] .hp-card-icon,
 .hp-view[data-hp-appearance="dark"] .hp-hero-greeting-icon,
 .hp-view[data-hp-appearance="dark"] .hp-hero-meta-icon { color: color-mix(in srgb,var(--hp-accent) 65%,#fff); }
-.hp-view .hp-card-hero { background: linear-gradient(110deg,color-mix(in srgb,#7c3aed 28%,var(--hp-card-bg)),var(--hp-card-bg) 70%); }
+.hp-view .hp-card-hero { background: linear-gradient(110deg,color-mix(in srgb,var(--hp-accent) 28%,var(--hp-card-bg)),var(--hp-card-bg) 70%); }
 .hp-view .hp-root:not(.is-editing) .hp-card-hero > .hp-card-header { position: absolute; top: 6px; right: 8px; z-index: 2; border: 0; padding: 0; }
 .hp-view .hp-root:not(.is-editing) .hp-card-hero > .hp-card-header .hp-card-title,
 .hp-view .hp-root:not(.is-editing) .hp-card-hero > .hp-card-header .hp-card-subtitle { display: none; }

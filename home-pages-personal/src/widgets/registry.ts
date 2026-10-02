@@ -97,13 +97,21 @@ export function onRegistryChange(listener: (kind: WidgetKind, registered: boolea
 
 export function createWidgetInstance(kind: WidgetKind, overrides: Partial<WidgetInstance> = {}): WidgetInstance {
   const definition = BY_KIND.get(kind);
+  const colors: NonNullable<WidgetInstance["colors"]> = {};
+  if (overrides.colors && typeof overrides.colors === "object" && !Array.isArray(overrides.colors)) {
+    for (const key of ["accent", "card", "text"] as const) {
+      const value = overrides.colors[key];
+      if (typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value)) colors[key] = value.toLowerCase();
+    }
+  }
   return {
     id: overrides.id ?? createId(kind),
     kind,
     title: overrides.title,
     w: overrides.w ?? definition?.defaultSize.w ?? 6,
     h: overrides.h ?? definition?.defaultSize.h ?? 6,
-    config: { ...(definition?.defaultConfig() ?? {}), ...(overrides.config ?? {}) }
+    config: { ...(definition?.defaultConfig() ?? {}), ...(overrides.config ?? {}) },
+    colors: Object.keys(colors).length ? colors : undefined
   };
 }
 

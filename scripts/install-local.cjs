@@ -7,7 +7,8 @@ const vault=fs.realpathSync(input),config=path.join(vault,".obsidian"),plugin=pa
 if(!fs.statSync(config).isDirectory())throw Error("The target must be an existing Obsidian vault.");
 for(const dir of [config,path.join(config,"plugins"),plugin])if(fs.existsSync(dir)&&fs.lstatSync(dir).isSymbolicLink())throw Error("Symlinked plugin directories are not supported by this installer.");
 const manifest=JSON.parse(fs.readFileSync(path.join(root,"manifest.json"),"utf8"));
-if(manifest.id!=="personal-launchpad"||manifest.version!=="3.0.0")throw Error("Build version does not match this installer.");
+const expectedVersion=JSON.parse(fs.readFileSync(path.join(root,"package.json"),"utf8")).version;
+if(manifest.id!=="personal-launchpad"||manifest.version!==expectedVersion)throw Error("Build version does not match the source package.");
 const enabledPath=path.join(config,"community-plugins.json"),oldEnabled=fs.existsSync(enabledPath)?fs.readFileSync(enabledPath,"utf8"):"[]";
 const enabled=JSON.parse(oldEnabled);if(!Array.isArray(enabled)||enabled.some(value=>typeof value!=="string"))throw Error("community-plugins.json is invalid; nothing was changed.");
 const stamp=new Date().toISOString().replace(/[:.]/g,"-"),backup=path.join(root,"backups",`plugin-before-v3-${stamp}-${crypto.randomBytes(3).toString("hex")}`);

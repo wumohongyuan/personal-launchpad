@@ -8,11 +8,13 @@ import { createWidgetInstance, isWidgetKind } from "./widgets/registry";
 import { PasteWidgetModal } from "./widgets/userLoader";
 import { PersonalServices, personalSettings } from "./personal/services";
 import { createPersonalPages } from "./personal/defaults";
+import { glassOpacity, openAppearanceEditor, sanitizeColors } from "./personal/appearance-editor";
 
 export const SETTINGS_VERSION = 1;
 
 export const DEFAULT_SETTINGS: HomePagesSettings = {
   appearance: "dark",
+  material: "glass",
   version: SETTINGS_VERSION,
   pages: [],
   activePageId: "",
@@ -59,7 +61,8 @@ export function sanitizeWidget(raw: unknown): WidgetInstance | null {
     title: typeof value.title === "string" && value.title.trim() ? value.title.trim() : undefined,
     w: clamp(value.w, 1, MAX_COLUMNS),
     h: clamp(value.h, 1, MAX_ROWS),
-    config: value.config && typeof value.config === "object" ? value.config : {}
+    config: value.config && typeof value.config === "object" ? value.config : {},
+    colors: value.colors
   });
   if (typeof value.provider === "string" && value.provider.trim()) widget.provider = value.provider.trim();
   return widget;
@@ -85,6 +88,11 @@ export function sanitizeSettings(raw: unknown): HomePagesSettings {
     : [];
   const settings: HomePagesSettings = {
     appearance: value.appearance === "light" || value.appearance === "system" ? value.appearance : "dark",
+    material: value.material === "solid" ? "solid" : "glass",
+    materialOpacity: glassOpacity(value.materialOpacity),
+    cardRadius: typeof value.cardRadius==="number"?clamp(value.cardRadius,6,30):undefined,
+    glassBlur: typeof value.glassBlur==="number"?clamp(value.glassBlur,0,28):undefined,
+    colors: sanitizeColors(value.colors),
     personal: value.personal,
     version: SETTINGS_VERSION,
     pages: pages.length > 0 ? pages : [createDefaultPage()],
@@ -121,14 +129,25 @@ export class HomePagesSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.addClass("hp-settings-tab");
+    if (!this.plugin.active || !this.plugin.personal) {
+      containerEl.createEl("p", { text: "配置正在读取、读取失败或插件已关闭。请先打开个人空间查看状态，再重新打开设置。" });
+      return;
+    }
     const settings = this.plugin.settings;
+    new Setting(containerEl).setName("自定义配色与材质").setDesc("用取色器调整工作台颜色，也可以改变玻璃透明度、圆角和模糊强度。")
+      .addButton(button=>button.setButtonText("外观配色").onClick(()=>openAppearanceEditor(this.plugin)));
+    new Setting(containerEl).setName("组件材质").setDesc("液态玻璃使用半透明表面和柔和高光，适配深浅外观。原版卡片可随时切回。")
+      .addDropdown(dropdown=>dropdown.addOptions({glass:"液态玻璃",solid:"原版卡片"}).setValue(settings.material||"glass").onChange(async value=>{
+        const previous=settings.material;
+        settings.material=value==="solid"?"solid":"glass";this.plugin.refreshViews({layoutOnly:true});
+        try {await this.plugin.saveSettings();} catch {settings.material=previous;dropdown.setValue(previous||"glass");this.plugin.refreshViews({layoutOnly:true});}
+      }));
     new Setting(containerEl).setName("工作台外观").setDesc("原版深色、清爽浅色，或跟随 Obsidian；只改变个人空间。")
       .addDropdown(dropdown=>dropdown.addOptions({dark:"原版深色",light:"清爽浅色",system:"跟随 Obsidian"}).setValue(settings.appearance||"dark").onChange(async value=>{
         settings.appearance=value==="light"||value==="system"?value:"dark";
         this.plugin.refreshViews({layoutOnly:true});await this.plugin.saveSettings();
       }));
     containerEl.createEl("p",{cls:"setting-item-description",text:"个人空间 · 基于 Home Pages 的专用版本。原版组件和布局自由保留，个人记录保存到你的笔记库。"});
-    if(!this.plugin.personal) {containerEl.createEl("p",{text:"配置正在读取，或读取失败。请先打开个人空间查看状态。"});return;}
     new Setting(containerEl).setName("会员与服务续费提醒").setDesc("Obsidian 打开时检查，按订阅的提前天数提示；同一账期每台设备每天提醒一次。关闭应用后不会发送系统通知。")
       .addToggle(toggle=>toggle.setValue(this.plugin.personal.settings.renewalReminders).onChange(async value=>{this.plugin.personal.settings.renewalReminders=value;settings.personal=this.plugin.personal.settings;await this.plugin.saveSettings();}));
     new Setting(containerEl).setName("个人资料保存目录").setDesc("日记、图书馆、成长资料及知识笔记的位置。修改目录不会移动原文件。")

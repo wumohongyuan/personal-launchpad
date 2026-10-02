@@ -9,6 +9,7 @@ import { createWidgetInstance, getWidgetDefinition, getWidgetProvider, normalize
 import { renderEmpty } from "./ui/dom";
 import type { WidgetContext } from "./widgets/types";
 import { animateLayout, moveBefore, PointerSorter } from "./ui/sortable";
+import { accentInk, appearanceFor, COLOR_FIELDS, glassOpacity, openAppearanceEditor, sanitizeColors, widgetColorsFor } from "./personal/appearance-editor";
 
 export const VIEW_TYPE_HOME = "personal-launchpad-view";
 const REFRESH_DEBOUNCE_MS = 900;
@@ -220,14 +221,29 @@ export class HomeView extends ItemView {
   applyLayout(): void {
     if(this.closed||!this.rootEl||!this.plugin.active)return;
     const { rowHeight, gap, maxWidth } = this.plugin.settings;
-    const appearance=this.plugin.settings.appearance||"dark";
+    const visual=appearanceFor(this.plugin);
+    const appearance=visual.appearance||"dark";
     this.contentEl.setAttribute("data-hp-appearance",appearance);
+    this.contentEl.setAttribute("data-hp-material",visual.material||"glass");
+    this.contentEl.style.setProperty("--hp-glass-opacity",`${Math.round(glassOpacity(visual.materialOpacity)*100)}%`);
+    const colors=sanitizeColors(visual.colors);
+    const variables:Record<string,string|undefined>={
+      "--background-secondary":colors.page,"--background-primary":colors.card,"--text-normal":colors.text,"--text-muted":colors.muted,
+      "--text-accent":colors.accent,"--interactive-accent":colors.accent,"--background-modifier-border":colors.border,
+      "--background-modifier-form-field":colors.input,"--background-primary-alt":colors.input,
+      "--text-on-accent":colors.accent?accentInk(colors.accent):undefined,
+      "--hp-custom-radius":typeof visual.cardRadius==="number"?`${visual.cardRadius}px`:undefined,
+      "--hp-custom-blur":typeof visual.glassBlur==="number"?`${visual.glassBlur}px`:undefined
+    };
+    for(const [key] of COLOR_FIELDS)variables[`--hp-custom-${key}`]=colors[key];
+    for(const [key,value] of Object.entries(variables))if(value)this.contentEl.style.setProperty(key,value);else this.contentEl.style.removeProperty(key);
     this.contentEl.toggleClass("theme-dark",appearance==="dark");
     this.contentEl.toggleClass("theme-light",appearance==="light");
     this.rootEl.style.setProperty("--hp-row", `${rowHeight}px`);
     this.rootEl.style.setProperty("--hp-gap", `${gap}px`);
     this.rootEl.style.setProperty("--hp-max-width", maxWidth > 0 ? `${maxWidth}px` : "none");
     this.rootEl.toggleClass("is-editing", this.editing);
+    for(const host of this.hosts.values())this.applyCardAppearance(host.cardEl,host.widget);
     this.renderTabs();
     this.updateHeader();
   }
@@ -262,6 +278,10 @@ export class HomeView extends ItemView {
     });
     const capture=this.tabsEl.createEl("button",{cls:"hp-tab hp-personal-quick-capture",text:"随手记",attr:{type:"button",title:"跳到记录输入框"}});
     capture.addEventListener("click",()=>void this.focusCapture());
+    const customize=this.tabsEl.createEl("button",{cls:"hp-tab hp-appearance-button",text:"外观配色",attr:{type:"button"}});
+    customize.addEventListener("click",()=>openAppearanceEditor(this.plugin));
+    const material=this.tabsEl.createEl("button",{cls:"hp-tab hp-material-toggle",text:this.plugin.settings.material==="solid"?"原版卡片":"液态玻璃",attr:{type:"button","aria-label":"液态玻璃","aria-pressed":String(this.plugin.settings.material!=="solid"),title:"切换液态玻璃与原版卡片"}});
+    material.addEventListener("click",()=>void this.toggleMaterial());
     const edit=this.tabsEl.createEl("button",{cls:"hp-tab hp-personal-edit",text:this.editing?"完成编辑":"编辑工作台",attr:{type:"button","aria-pressed":String(this.editing)}});
     edit.addEventListener("click",()=>this.toggleEditing());
   }
@@ -275,6 +295,22 @@ export class HomeView extends ItemView {
     if(this.closed||!this.plugin.active)return;
     if(input) {input.scrollIntoView({block:"center",behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"});input.focus({preventScroll:true});}
     else new Notice("在编辑工作台中添加「随手记录」组件，即可从这里开始记录。");
+  }
+
+  private async toggleMaterial():Promise<void> {
+    const previous=this.plugin.settings.material;
+    this.plugin.settings.material=previous==="solid"?"glass":"solid";
+    this.applyLayout();
+    let button=this.tabsEl.querySelector<HTMLButtonElement>(".hp-material-toggle");
+    if(button)button.disabled=true;
+    try {await this.plugin.saveSettings();}
+    catch {this.plugin.settings.material=previous;this.applyLayout();}
+    finally {
+      if(!this.closed&&this.plugin.active) {
+        button=this.tabsEl.querySelector<HTMLButtonElement>(".hp-material-toggle");
+        if(button){button.disabled=false;button.focus({preventScroll:true});}
+      }
+    }
   }
 
   private renderToolbar(): void {
@@ -327,7 +363,7 @@ export class HomeView extends ItemView {
     const card = createDiv({ cls: `hp-card hp-card-${widget.kind}`, attr: { "data-id": widget.id } });
     if (before) this.gridEl.insertBefore(card, before);
     else this.gridEl.appendChild(card);
-    card.style.setProperty("--hp-accent", definition?.accent ?? "#64748b");
+    this.applyCardAppearance(card,widget);
     this.applyCardSize(card, widget);
 
     const header = card.createDiv({ cls: "hp-card-header" });
@@ -366,6 +402,17 @@ export class HomeView extends ItemView {
     card.setAttribute("data-h", String(h));
     card.style.setProperty("--hp-card-w", String(w));
     card.style.setProperty("--hp-card-h", String(h));
+  }
+
+  private applyCardAppearance(card:HTMLElement,widget:WidgetInstance):void {
+    const global=sanitizeColors(appearanceFor(this.plugin).colors),colors=sanitizeColors(widgetColorsFor(this.plugin,widget));
+    card.style.setProperty("--hp-accent",colors.accent||global.accent||getWidgetDefinition(widget.kind)?.accent||"#64748b");
+    const variables:Record<string,string|undefined>={
+      "--hp-custom-accent":colors.accent,"--hp-custom-card":colors.card,"--hp-custom-text":colors.text,
+      "--hp-card-bg":colors.card,"--background-primary":colors.card,"--text-normal":colors.text,"--text-muted":colors.text,"--hp-muted":colors.text,
+      "--interactive-accent":colors.accent,"--text-accent":colors.accent,"--text-on-accent":colors.accent?accentInk(colors.accent):undefined
+    };
+    for(const [key,value] of Object.entries(variables))if(value)card.style.setProperty(key,value);else card.style.removeProperty(key);
   }
 
   private renderEditBar(card: HTMLElement, widget: WidgetInstance): void {
@@ -448,15 +495,35 @@ export class HomeView extends ItemView {
   }
 
   openWidgetSettings(id: string): void {
-    const widget = this.page.widgets.find((item) => item.id === id);
+    const page = this.page;
+    const widget = page.widgets.find((item) => item.id === id);
     if (!widget) return;
+    const initial = { kind: widget.kind, title: widget.title, w: widget.w, h: widget.h, config: JSON.stringify(normalizeWidgetConfig(widget)) };
     new WidgetSettingsModal(this.app, this.plugin, widget, async (updated) => {
-      const page = this.page;
       const index = page.widgets.findIndex((item) => item.id === id);
-      if (index < 0) return;
+      if (index < 0 || !this.plugin.active) throw new Error("组件已关闭，请重新打开后保存。");
+      const previous = page.widgets[index];
+      const configChanged = initial.config !== JSON.stringify(updated.config);
+      const colorsOnly = initial.kind === updated.kind && initial.title === updated.title
+        && initial.w === updated.w && initial.h === updated.h && !configChanged;
+      if (colorsOnly) {
+        // Preserve the instance captured by live widget callbacks and its editing DOM.
+        const previousColors = previous.colors;
+        previous.colors = updated.colors;
+        try { await this.plugin.saveSettings(); }
+        catch (error) { previous.colors = previousColors; throw error; }
+        this.plugin.refreshViews({ layoutOnly: true });
+        return;
+      }
+      // Timers and other live widgets may save state while their settings are open.
+      if (!configChanged) updated.config = { ...previous.config };
+      else if (initial.config !== JSON.stringify(normalizeWidgetConfig(previous))) {
+        throw new Error("组件内容在配置期间已更新，请重新打开配置后修改。配色预览仍保留。");
+      }
       page.widgets[index] = updated;
-      await this.plugin.saveSettings();
-      this.replaceCard(updated);
+      try { await this.plugin.saveSettings(); }
+      catch (error) { page.widgets[index] = previous; throw error; }
+      if (!this.closed && this.plugin.active && this.page.id === page.id) this.replaceCard(updated);
     }).open();
   }
 
@@ -468,6 +535,7 @@ export class HomeView extends ItemView {
       return;
     }
     host.widget = widget;
+    this.applyCardAppearance(host.cardEl, widget);
     this.applyCardSize(host.cardEl, widget);
     host.cardEl.querySelector(".hp-card-title-text")?.setText(widgetDisplayTitle(widget));
     this.renderEditBar(host.cardEl, widget);
@@ -529,7 +597,7 @@ export class HomeView extends ItemView {
     const index = widgets.findIndex((item) => item.id === id);
     if (index < 0) return;
     const source = widgets[index];
-    const copy: WidgetInstance = { ...source, id: createId(source.kind), config: JSON.parse(JSON.stringify(source.config)) as Record<string, unknown> };
+    const copy: WidgetInstance = { ...source, colors: source.colors?{...source.colors}:undefined, id: createId(source.kind), config: JSON.parse(JSON.stringify(source.config)) as Record<string, unknown> };
     widgets.splice(index + 1, 0, copy);
     await this.plugin.saveSettings();
     if(this.closed||this.page.id!==pageId||!this.plugin.active)return;

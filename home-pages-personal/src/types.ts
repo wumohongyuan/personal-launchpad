@@ -30,6 +30,8 @@ export interface WidgetInstance {
   /** 行跨度（行高由全局设置决定）。 */
   h: number;
   config: Record<string, unknown>;
+  /** 只覆盖本组件；未设置的颜色继承全局配色或组件默认值。 */
+  colors?: { accent?: string; card?: string; text?: string };
   /** 第三方组件：提供该 kind 的插件 id（用于插件未加载时的占位提示）。 */
   provider?: string;
 }
@@ -43,6 +45,12 @@ export interface HomePage {
 export interface HomePagesSettings {
   /** Theme scoped to the workbench; never changes Obsidian's application theme. */
   appearance?: "dark" | "light" | "system";
+  /** Glass changes presentation only; widget layouts and records stay independent. */
+  material?: "glass" | "solid";
+  materialOpacity?: number;
+  cardRadius?: number;
+  glassBlur?: number;
+  colors?: Partial<Record<"page" | "card" | "text" | "muted" | "accent" | "border" | "input", string>>;
   /** Personal Markdown storage locations, preserved across upgrades. */
   personal?: import("./personal/services").PersonalSettings;
   version: number;

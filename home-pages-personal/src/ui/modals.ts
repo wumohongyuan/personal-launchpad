@@ -3,6 +3,8 @@ import type HomePagesPlugin from "../main";
 import type { WidgetInstance, WidgetKind } from "../types";
 import { getWidgetDefinition, isBuiltinKind, listWidgetDefinitions, normalizeWidgetConfig } from "../widgets/registry";
 import type { WidgetSettingsContext } from "../widgets/types";
+import { createId } from "../utils/id";
+import { clearWidgetColorPreview, previewWidgetColors } from "../personal/appearance-editor";
 
 export const MAX_COLUMNS = 12;
 export const MAX_ROWS = 30;
@@ -12,6 +14,8 @@ export class WidgetSettingsModal extends Modal {
   private draft: WidgetInstance;
   private draftConfig: Record<string, unknown>;
   private bodyEl!: HTMLElement;
+  private saving = false;
+  private readonly colorId = createId("widget-colors");
 
   constructor(
     app: App,
@@ -20,8 +24,9 @@ export class WidgetSettingsModal extends Modal {
     private readonly onSave: (updated: WidgetInstance) => void | Promise<void>
   ) {
     super(app);
-    this.draft = { ...widget, config: { ...widget.config } };
+    this.draft = { ...widget, config: { ...widget.config }, colors: widget.colors ? { ...widget.colors } : undefined };
     this.draftConfig = normalizeWidgetConfig(widget);
+    plugin.register(() => this.close());
   }
 
   onOpen(): void {
@@ -32,13 +37,28 @@ export class WidgetSettingsModal extends Modal {
     this.renderBody();
 
     const footer = this.contentEl.createDiv({ cls: "hp-modal-footer" });
+    const error = this.contentEl.createDiv({ cls: "hp-personal-error", attr: { role: "status" } });
     new Setting(footer)
       .addButton((button) => button.setButtonText("取消").onClick(() => this.close()))
       .addButton((button) => button.setButtonText("保存").setCta().onClick(async () => {
-        const definition = getWidgetDefinition(this.draft.kind);
-        const normalized = definition?.normalizeConfig ? definition.normalizeConfig(this.draftConfig) : this.draftConfig;
-        await this.onSave({ ...this.draft, config: { ...normalized } });
-        this.close();
+        if (this.saving) return;
+        this.saving = true;
+        button.setDisabled(true);
+        this.bodyEl.inert = true;
+        error.setText("");
+        try {
+          const definition = getWidgetDefinition(this.draft.kind);
+          const normalized = definition?.normalizeConfig ? definition.normalizeConfig(this.draftConfig) : this.draftConfig;
+          await this.onSave({ ...this.draft, config: { ...normalized }, colors: this.draft.colors ? { ...this.draft.colors } : undefined });
+          this.saving = false;
+          this.close();
+        } catch (reason) {
+          error.setText(reason instanceof Error ? reason.message : "设置没有保存成功，请重试。");
+        } finally {
+          this.saving = false;
+          this.bodyEl.inert = false;
+          button.setDisabled(false);
+        }
       }));
   }
 
@@ -60,6 +80,7 @@ export class WidgetSettingsModal extends Modal {
         this.draft.h = value;
       }));
 
+    this.renderColors(container);
     if (!definition) return;
     container.createEl("h3", { cls: "hp-modal-section", text: "组件设置" });
     const ctx: WidgetSettingsContext<Record<string, unknown>> = {
@@ -74,7 +95,66 @@ export class WidgetSettingsModal extends Modal {
     definition.renderSettings(container, ctx);
   }
 
+  private renderColors(container: HTMLElement): void {
+    container.createEl("h3", { cls: "hp-modal-section", text: "组件配色" });
+    container.createEl("p", { cls: "hp-color-intro", text: "只调整这个组件，边选边预览。继承默认时使用全局配色；全局未设时使用主题或组件默认色。取消不会保存。" });
+    const grid = container.createDiv({ cls: "hp-color-grid" });
+    const appearance = this.plugin.settings.appearance;
+    const dark = appearance !== "light" && (appearance !== "system" || document.body.classList.contains("theme-dark"));
+    const fallback = {
+      accent: getWidgetDefinition(this.draft.kind)?.accent ?? "#a998e5",
+      card: dark ? "#25262e" : "#ffffff",
+      text: dark ? "#ececf2" : "#282a39"
+    };
+    for (const [key, title] of [["accent", "强调色"], ["card", "卡片底色"], ["text", "文字颜色"]] as const) {
+      const row = grid.createDiv({ cls: "hp-color-row", attr: { "data-widget-color": key } });
+      const id = `${this.colorId}-${key}`;
+      row.createEl("label", { text: title, attr: { for: id } });
+      const controls = row.createDiv({ cls: "hp-color-controls" });
+      const picker = controls.createEl("input", { cls: "hp-color-picker", attr: { id, type: "color", "aria-label": `组件${title}` } });
+      const reset = controls.createEl("button", { cls: "hp-color-reset", text: "恢复继承", attr: { type: "button", "aria-label": `${title}恢复继承` } });
+      const inheritLabel = row.createEl("label", { cls: "hp-color-inherit" });
+      const inherit = inheritLabel.createEl("input", { attr: { type: "checkbox", "aria-label": `${title}继承默认` } });
+      inheritLabel.createSpan({ text: "继承默认" });
+      const state = row.createEl("small", { cls: "hp-color-state", attr: { role: "status" } });
+      const inheritedColor = (): string => {
+        const color = this.plugin.settings.colors?.[key] ?? fallback[key];
+        return /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : "#a998e5";
+      };
+      const sync = (): void => {
+        const color = this.draft.colors?.[key];
+        picker.value = color ?? inheritedColor();
+        inherit.checked = !color;
+        reset.disabled = !color;
+        state.setText(color ? "仅此组件 · 自定义" : "跟随全局 / 默认");
+      };
+      const preview = (): void => {
+        if (this.draft.colors && !Object.keys(this.draft.colors).length) this.draft.colors = undefined;
+        sync();
+        previewWidgetColors(this.plugin, this.draft.id, this.draft.colors);
+      };
+      const restore = (): void => { delete this.draft.colors?.[key]; preview(); };
+      picker.addEventListener("input", () => {
+        if (!/^#[0-9a-f]{6}$/i.test(picker.value)) return;
+        this.draft.colors = { ...this.draft.colors, [key]: picker.value.toLowerCase() };
+        preview();
+      });
+      inherit.addEventListener("change", () => {
+        if (inherit.checked) restore();
+        else { this.draft.colors = { ...this.draft.colors, [key]: picker.value }; preview(); }
+      });
+      reset.addEventListener("click", restore);
+      sync();
+    }
+  }
+
+  close(): void {
+    if (this.saving && this.plugin.active) return;
+    super.close();
+  }
+
   onClose(): void {
+    clearWidgetColorPreview(this.plugin, this.draft.id);
     this.contentEl.empty();
   }
 }
