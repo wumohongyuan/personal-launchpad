@@ -1,0 +1,45 @@
+.hp-card-body .hp-personal-flow { display: flex; flex: 1; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; padding: 14px; overflow-y: auto; overscroll-behavior: contain; }
+.hp-card-body .hp-personal-flow p,
+.hp-card-body .hp-personal-flow h3,
+.hp-card-body .hp-personal-flow h4 { margin: 0; }
+.hp-card-body .hp-personal-title { font-size: 1.18em; line-height: 1.5; font-weight: 650; }
+.hp-card-body .hp-personal-muted { color: var(--hp-muted, var(--text-muted)); line-height: 1.75; overflow-wrap: anywhere; }
+.hp-card-body .hp-personal-caption { color: var(--hp-muted, var(--text-muted)); font-size: .85em; line-height: 1.6; }
+.hp-card-body .hp-personal-prose { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.75; }
+.hp-card-body .hp-personal-progress { width: 100%; height: 7px; accent-color: var(--hp-accent, #38725b); border: 0; border-radius: 99px; overflow: hidden; }
+.hp-card-body .hp-personal-progress::-webkit-progress-bar { background: var(--background-modifier-border); border-radius: 99px; }
+.hp-card-body .hp-personal-progress::-webkit-progress-value { background: var(--hp-accent, #38725b); border-radius: 99px; }
+.hp-card-body .hp-personal-section { border-top: 1px solid var(--background-modifier-border); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+.hp-card-body .hp-personal-section h4 { font-size: 1em; line-height: 1.5; }
+.hp-card-body .hp-personal-actions-list { padding-left: 1.3em; margin: 0; line-height: 1.9; }
+.hp-card-body .hp-personal-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.hp-card-body .hp-personal-toolbar > h4 { margin-right: auto; }
+.hp-card-body .hp-personal-toolbar > input[type=date] { min-width: 0; max-width: 100%; }
+.hp-card-body .hp-personal-milestone { display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
+.hp-card-body .hp-personal-milestone > label { flex: 1 1 190px; display: flex; align-items: flex-start; gap: 8px; line-height: 1.65; min-width: 0; }
+.hp-card-body .hp-personal-milestone input { flex: 0 0 auto; margin-top: 5px; }
+.hp-card-body .hp-personal-milestone label span { overflow-wrap: anywhere; }
+.hp-card-body .hp-personal-feedback { border-left: 2px solid var(--background-modifier-border); padding: 2px 0 2px 12px; }
+.hp-card-body .hp-personal-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(112px, 100%), 1fr)); gap: 8px; }
+.hp-card-body .hp-personal-kpis[hidden] { display: none; }
+.hp-card-body .hp-personal-kpis .hp-kpi { min-width: 0; padding: 12px; }
+.hp-card-body .hp-personal-kpis .hp-kpi-value { font-size: 1.35em; }
+.hp-card-body .hp-personal-kpis .hp-kpi-label { font-size: .85em; }
+.hp-card-body button.hp-personal-record-row,
+.hp-card-body button.hp-personal-note-row { width: 100%; height: auto; min-height: 48px; padding: 11px 6px; border: 0; border-bottom: 1px solid var(--background-modifier-border); border-radius: 0; box-shadow: none; background: transparent; text-align: left; white-space: normal; color: var(--text-normal); }
+.hp-card-body button.hp-personal-record-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.hp-card-body button.hp-personal-note-row { display: flex; flex-direction: column; align-items: stretch; gap: 5px; }
+.hp-card-body button.hp-personal-record-row:hover,
+.hp-card-body button.hp-personal-note-row:hover { background: var(--background-modifier-hover); }
+.hp-card-body .hp-personal-record-row .hp-list-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.hp-card-body .hp-personal-note-row .hp-list-sub,
+.hp-card-body .hp-personal-record-row .hp-list-sub { white-space: normal; overflow-wrap: anywhere; line-height: 1.65; }
+.hp-card-body .hp-personal-review-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(235px, 100%), 1fr)); gap: 14px; }
+.hp-card-body .hp-personal-field { display: flex; flex-direction: column; gap: 9px; min-width: 0; font-size: .94em; }
+.hp-card-body .hp-personal-field textarea { display: block; box-sizing: border-box; width: 100%; min-height: 112px; resize: vertical; border-radius: 8px; padding: 10px 12px; line-height: 1.75; font: inherit; background: var(--background-primary); }
+.hp-card-body .hp-personal-search { flex: 1 1 190px; min-width: 0; max-width: 100%; height: 36px; }
+.hp-card-body .hp-personal-flow .hp-pill { min-height: 32px; height: auto; padding-top: 6px; padding-bottom: 6px; white-space: normal; }
+.is-mobile .hp-card-body .hp-personal-flow .hp-pill { min-height: 42px; }
+.hp-card-body .hp-personal-flow button:focus-visible,
+.hp-card-body .hp-personal-flow input:focus-visible,
+.hp-card-body .hp-personal-flow textarea:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }

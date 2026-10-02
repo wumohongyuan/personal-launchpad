@@ -1,0 +1,103 @@
+/* The personal library is a native Home Pages widget. It never styles the host shell. */
+.hp-personal-library{flex:1;min-height:0;min-width:0;overflow:auto;overscroll-behavior:contain;box-sizing:border-box;padding:16px 18px 22px;color:var(--text-normal);container-type:inline-size;container-name:hp-personal-library;scrollbar-width:thin}
+.hp-personal-library *{box-sizing:border-box}
+.hp-personal-library [hidden]{display:none!important}
+.hp-personal-library .hp-pl-controls{margin-bottom:14px}
+.hp-personal-library .hp-pl-toolbar{display:flex;align-items:center;gap:10px;min-width:0;margin-bottom:12px}
+.hp-personal-library .hp-pl-search{display:flex;align-items:center;gap:8px;flex:1;min-width:0;padding:0 10px;min-height:38px;border:1px solid var(--hp-border);border-radius:8px;background:var(--background-primary-alt)}
+.hp-personal-library .hp-pl-search:focus-within{border-color:var(--hp-accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--hp-accent) 12%,transparent)}
+.hp-personal-library .hp-pl-search input{border:0;box-shadow:none!important;outline:none;background:transparent;min-width:0;width:100%;font-size:12px;height:36px;padding:5px 0;color:var(--text-normal)}
+.hp-personal-library .hp-pl-icon{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;color:inherit}
+.hp-personal-library .hp-pl-icon svg{width:15px;height:15px}
+.hp-personal-library .hp-pl-search>.hp-pl-icon{color:var(--hp-muted)}
+.hp-personal-library .hp-pl-button{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:auto;min-height:36px;max-width:100%;padding:7px 10px;border-radius:7px;font-size:12px;font-weight:500;line-height:1.6;white-space:normal;box-shadow:none;cursor:pointer;transition:background .15s,border-color .15s,transform .15s}
+.hp-personal-library .hp-pl-button:disabled{opacity:.5;cursor:wait}
+.hp-personal-library .hp-pl-button:focus-visible,.hp-personal-library select:focus-visible{outline:2px solid var(--hp-accent);outline-offset:2px}
+.hp-personal-library .hp-pl-button.mod-cta{background:var(--hp-accent);color:#fff;border-color:transparent}
+.hp-personal-library .hp-pl-button.mod-cta:hover{background:color-mix(in srgb,var(--hp-accent) 90%,#000)}
+.hp-personal-library .hp-pl-filters{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.hp-personal-library .hp-pl-tabs{display:flex;gap:3px;flex-wrap:wrap}
+.hp-personal-library .hp-pl-tabs .hp-pl-button{background:transparent;border:1px solid transparent;color:var(--hp-muted);font-size:11px;min-height:34px;padding:5px 10px}
+.hp-personal-library .hp-pl-tabs .hp-pl-button[aria-pressed="true"]{background:color-mix(in srgb,var(--hp-accent) 12%,transparent);color:var(--hp-accent);font-weight:650}
+.hp-personal-library .hp-pl-category{min-width:0;max-width:170px;height:34px;box-shadow:none;font-size:11px;border-color:var(--hp-border);background-color:var(--background-primary-alt)}
+.hp-personal-library .hp-pl-summary{color:var(--hp-muted);font-size:11px;line-height:1.75;margin:0 0 15px;overflow-wrap:anywhere}
+.hp-personal-library .hp-pl-status{font-size:11px;line-height:1.8;color:var(--hp-accent);margin:0 0 12px;overflow-wrap:anywhere}
+.hp-personal-library .hp-pl-status:empty{display:none}
+.hp-personal-library .hp-pl-status.is-error{color:var(--text-error)}
+.hp-personal-library .hp-pl-content{min-width:0}
+.hp-personal-library .hp-pl-content>.hp-pl-button{margin-top:10px}
+.hp-personal-library .hp-pl-content>.hp-pl-button:first-child{margin-top:0}
+.hp-personal-library .hp-empty{min-height:170px;border:1px dashed var(--hp-border);border-radius:10px;background:var(--background-primary-alt);font-size:12px;text-align:center;line-height:1.9;gap:10px}
+.hp-personal-library .hp-empty strong{font-size:14px;color:var(--text-normal);font-weight:550}
+.hp-personal-library .hp-pl-shelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(135px,1fr));gap:25px 23px}
+.hp-personal-library .hp-pl-book{min-width:0;padding-bottom:14px;border-bottom:2px solid var(--hp-border);animation:hp-pl-enter .24s ease both}
+.hp-personal-library .hp-pl-book:nth-child(2){animation-delay:20ms}.hp-personal-library .hp-pl-book:nth-child(3){animation-delay:40ms}.hp-personal-library .hp-pl-book:nth-child(n+4){animation-delay:60ms}
+.hp-personal-library .hp-pl-book-open{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;width:100%;height:auto;min-width:0;text-align:left;padding:0;border:0;border-radius:5px;background:transparent;box-shadow:none;gap:7px}
+.hp-personal-library .hp-pl-book-open:hover{background:transparent}
+.hp-personal-library .hp-pl-cover{position:relative;isolation:isolate;display:flex;flex-direction:column;align-self:center;overflow:hidden;aspect-ratio:3/4;width:100%;max-width:185px;min-width:0;padding:18px 16px 16px 22px;border-radius:2px 7px 7px 2px;gap:14px;background:#dce6d9;color:#294731;box-shadow:inset 5px 0 0 #0000000e,inset 7px 0 0 #ffffff33,3px 4px 0 #00000008;margin-bottom:6px;transition:transform .18s ease}
+.hp-personal-library .hp-pl-cover-1{background:#e7ddd0;color:#5b4630}.hp-personal-library .hp-pl-cover-2{background:#dbe3e8;color:#334f5b}.hp-personal-library .hp-pl-cover-3{background:#e6dce0;color:#61444f}
+.hp-personal-library .hp-pl-cover-label{font-size:8px;line-height:1.5;letter-spacing:.13em;opacity:.72;font-weight:600;flex-shrink:0}
+.hp-personal-library .hp-pl-cover-title{font-size:21px;line-height:1.5;font-weight:600;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.hp-personal-library .hp-pl-cover-author{margin-top:auto;font-size:9px;line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-top:1px solid #00000022;padding-top:10px;flex-shrink:0}
+.hp-personal-library .hp-pl-cover-image{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;z-index:1}
+.hp-personal-library .hp-pl-book-title{font-size:13px;font-weight:650;line-height:1.6;overflow-wrap:anywhere;color:var(--text-normal)}
+.hp-personal-library .hp-pl-author{font-size:11px;line-height:1.8;color:var(--hp-muted);overflow-wrap:anywhere;margin:0}
+.hp-personal-library .hp-pl-book-meta{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:9px;min-height:21px}
+.hp-personal-library .hp-pl-badge{display:inline-flex;align-items:center;width:fit-content;max-width:100%;padding:2px 6px;border-radius:4px;background:color-mix(in srgb,var(--hp-accent) 10%,transparent);color:var(--hp-accent);font-size:10px;line-height:1.6;overflow-wrap:anywhere}
+.hp-personal-library .hp-pl-category-label{font-size:10px;line-height:1.6;color:var(--hp-muted);overflow-wrap:anywhere}
+.hp-personal-library .hp-pl-progress{appearance:none;display:block;width:100%;height:4px;border:0;border-radius:4px;overflow:hidden;margin:12px 0 7px;accent-color:var(--hp-accent);background:var(--hp-border)}
+.hp-personal-library .hp-pl-progress::-webkit-progress-bar{background:var(--hp-border)}
+.hp-personal-library .hp-pl-progress::-webkit-progress-value{background:var(--hp-accent);border-radius:4px}
+.hp-personal-library .hp-pl-book-foot{display:block;color:var(--hp-muted);font-size:10px;line-height:1.6;margin-top:8px;overflow-wrap:anywhere}
+.hp-personal-library .hp-pl-detail{margin-top:18px;animation:hp-pl-enter .2s ease both}
+.hp-personal-library .hp-pl-book-hero{display:grid;grid-template-columns:135px minmax(0,1fr);gap:25px;align-items:start;padding-bottom:22px;border-bottom:1px solid var(--hp-border)}
+.hp-personal-library .hp-pl-book-hero .hp-pl-cover{align-self:start}
+.hp-personal-library .hp-pl-book-info{min-width:0}
+.hp-personal-library .hp-pl-book-info h3{font-size:23px;line-height:1.5;letter-spacing:-.01em;margin:10px 0 6px;overflow-wrap:anywhere;font-weight:650}
+.hp-personal-library .hp-pl-book-info .hp-pl-summary{margin:8px 0 0}
+.hp-personal-library .hp-pl-actions{display:flex;flex-wrap:wrap;align-items:center;gap:7px 9px;margin-top:14px}
+.hp-personal-library .hp-pl-actions .hp-pl-button{font-size:11px}
+.hp-personal-library .hp-pl-notes{padding-top:20px}
+.hp-personal-library .hp-pl-note-heading{display:flex;gap:15px;align-items:center;justify-content:space-between;margin-bottom:5px}
+.hp-personal-library .hp-pl-note-heading h4{font-size:14px;line-height:1.5;font-weight:650;margin:0}
+.hp-personal-library .hp-pl-note-heading .hp-pl-summary{margin:0}
+.hp-personal-library .hp-pl-note{padding:20px 0;border-bottom:1px solid var(--hp-border)}
+.hp-personal-library .hp-pl-note:last-child{border-bottom:0}
+.hp-personal-library .hp-pl-note-meta{display:flex;gap:10px;align-items:center;flex-wrap:wrap;color:var(--hp-muted);font-size:10px;line-height:1.8;margin-bottom:12px}
+.hp-personal-library .hp-pl-prose{font-size:13px;line-height:1.95;white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
+.hp-personal-library .hp-pl-note-actions .hp-pl-button{background:transparent;border-color:transparent;color:var(--hp-accent);padding:4px 3px;min-height:30px;font-size:10px}
+.hp-personal-library .hp-pl-note-actions .hp-pl-button:hover{background:color-mix(in srgb,var(--hp-accent) 8%,transparent)}
+.hp-personal-library .hp-pl-original{padding:17px;border:1px solid var(--hp-border);background:var(--background-primary-alt);border-radius:10px;margin-top:18px}
+.hp-personal-library .hp-pl-original h4{font-size:13px;margin:0 0 10px}
+.hp-personal-library .hp-pl-original .hp-pl-prose{color:var(--hp-muted);font-size:12px}
+@container hp-personal-library (max-width:440px){
+  .hp-personal-library .hp-pl-toolbar{gap:7px}
+  .hp-personal-library .hp-pl-toolbar>.hp-pl-button{padding:7px 9px;font-size:11px;min-height:44px;white-space:nowrap}
+  .hp-personal-library .hp-pl-search{min-height:44px;gap:6px;padding:0 8px}
+  .hp-personal-library .hp-pl-search input{font-size:12px;height:42px}
+  .hp-personal-library .hp-pl-filters{gap:5px;flex-wrap:nowrap}
+  .hp-personal-library .hp-pl-tabs{gap:1px;flex-wrap:nowrap}
+  .hp-personal-library .hp-pl-tabs .hp-pl-button{min-height:44px;padding:5px 7px;font-size:10px}
+  .hp-personal-library .hp-pl-category{max-width:96px;height:44px;font-size:10px;padding:5px}
+  .hp-personal-library .hp-pl-summary{font-size:10px;margin-bottom:14px}
+  .hp-personal-library .hp-pl-shelf{grid-template-columns:repeat(2,minmax(0,1fr));gap:21px 17px}
+  .hp-personal-library .hp-pl-cover{padding:16px 12px 13px 18px;gap:11px}
+  .hp-personal-library .hp-pl-cover-title{font-size:18px;line-height:1.45;-webkit-line-clamp:3}
+  .hp-personal-library .hp-pl-cover-label{font-size:7px}
+  .hp-personal-library .hp-pl-cover-author{font-size:8px;padding-top:8px}
+  .hp-personal-library .hp-pl-book-hero{grid-template-columns:92px minmax(0,1fr);gap:18px}
+  .hp-personal-library .hp-pl-book-hero .hp-pl-cover{padding:12px 10px 10px 15px;gap:8px}
+  .hp-personal-library .hp-pl-book-hero .hp-pl-cover-title{font-size:16px;-webkit-line-clamp:2;flex-shrink:0}
+  .hp-personal-library .hp-pl-book-hero .hp-pl-cover-label{font-size:5px}
+  .hp-personal-library .hp-pl-book-hero .hp-pl-cover-author{font-size:7px;padding-top:7px}
+  .hp-personal-library .hp-pl-book-info h3{font-size:19px;margin-top:8px}
+  .hp-personal-library .hp-pl-book-info .hp-pl-summary{font-size:10px}
+  .hp-personal-library .hp-pl-actions{gap:7px;margin-top:12px}
+  .hp-personal-library .hp-pl-button,.hp-personal-library .hp-pl-note-actions .hp-pl-button{min-height:44px}
+  .hp-personal-library .hp-pl-actions .hp-pl-button{font-size:10px;padding:5px 7px}
+  .hp-personal-library .hp-pl-prose{font-size:13px}
+}
+@container hp-personal-library (max-width:265px){.hp-personal-library .hp-pl-toolbar{flex-wrap:wrap}.hp-personal-library .hp-pl-search{flex-basis:100%}.hp-personal-library .hp-pl-toolbar>.hp-pl-button{width:100%}.hp-personal-library .hp-pl-filters{flex-wrap:wrap}.hp-personal-library .hp-pl-category{width:100%;max-width:none}.hp-personal-library .hp-pl-shelf{grid-template-columns:minmax(0,1fr)}.hp-personal-library .hp-pl-book-hero{grid-template-columns:minmax(0,1fr)}.hp-personal-library .hp-pl-book-hero .hp-pl-cover{max-width:100px;align-self:start;margin:0 auto}.hp-personal-library .hp-pl-book-info h3{font-size:18px}}
+@media(hover:hover) and (pointer:fine){.hp-personal-library .hp-pl-book-open:hover .hp-pl-cover{transform:translateY(-3px)}.hp-personal-library .hp-pl-button.mod-cta:hover{transform:translateY(-1px)}}
+@keyframes hp-pl-enter{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.hp-personal-library *,.hp-personal-library *::before,.hp-personal-library *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important;transform:none!important}}

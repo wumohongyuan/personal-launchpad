@@ -1,0 +1,53 @@
+/* Personal record content inside Home Pages' original widget cards. */
+.hp-personal-capture { display: flex; flex: 1; flex-direction: column; min-height: 0; gap: 12px; padding: 14px; overflow-y: auto; }
+.hp-personal-journal, .hp-personal-tasks { flex: 1; min-height: 0; padding: 14px; overflow-y: auto; }
+.hp-personal-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.hp-personal-tab, .hp-personal-action {
+  border: 0; box-shadow: none; background: transparent; color: var(--text-muted);
+  padding: 6px 9px; border-radius: 6px; height: auto; font-size: 12px; line-height: 1.5;
+}
+.hp-personal-tab[aria-pressed="true"] { color: var(--text-accent); background: var(--background-modifier-hover); }
+.hp-personal-tab:hover, .hp-personal-action:hover { color: var(--text-normal); background: var(--background-modifier-hover); }
+.hp-personal-compose-label { font-size: 13px; color: var(--text-muted); }
+.hp-personal-compose-input {
+  display: block; width: 100%; min-height: 110px; flex: 1; resize: vertical; font: inherit;
+  font-size: 14px; line-height: 1.8; padding: 12px; border-radius: 8px;
+  border: 1px solid var(--background-modifier-border); box-shadow: none;
+  background: var(--background-primary); color: var(--text-normal);
+}
+.hp-personal-compose-bottom { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.hp-personal-hint { color: var(--text-muted); font-size: 11px; line-height: 1.7; }
+.hp-personal-status { color: var(--text-muted); font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
+.hp-personal-status:empty { display: none; }
+.hp-personal-status.is-error { color: var(--text-error); }
+.hp-personal-journal-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.hp-personal-date { min-width: 0; max-width: 150px; }
+.hp-personal-journal-list { display: flex; flex-direction: column; }
+.hp-personal-entry { padding: 15px 0; border-bottom: 1px solid var(--background-modifier-border); }
+.hp-personal-entry:first-child { padding-top: 0; }
+.hp-personal-entry:last-child { border-bottom: 0; }
+.hp-personal-entry-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 9px; font-size: 11px; color: var(--text-muted); }
+.hp-personal-kind { color: var(--text-accent); }
+.hp-personal-entry-content { font-size: 14px; line-height: 1.85; overflow-wrap: anywhere; }
+.hp-personal-entry-content > :first-child { margin-top: 0; }
+.hp-personal-entry-content > :last-child { margin-bottom: 0; }
+.hp-personal-entry-content p { margin: 0.65em 0; }
+.hp-personal-entry-content h1, .hp-personal-entry-content h2, .hp-personal-entry-content h3 { font-size: 1.1em; margin: 0.9em 0 0.5em; }
+.hp-personal-entry-content img { max-width: 100%; }
+.hp-personal-entry-content pre { max-width: 100%; overflow: auto; }
+.hp-personal-entry-actions { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
+.hp-personal-entry-actions .hp-personal-action:first-child { margin-left: -9px; }
+.hp-personal-original { margin-top: 10px; padding: 12px; border-radius: 8px; background: var(--background-secondary); }
+.hp-personal-task-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+.hp-personal-task { padding: 10px 0; border-bottom: 1px solid var(--background-modifier-border); }
+.hp-personal-task:last-child { border-bottom: 0; }
+.hp-personal-task-label { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.hp-personal-task-label input[type="checkbox"] { flex: none; margin: 5px 0 0; }
+.hp-personal-task-text { font-size: 13px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+.hp-personal-task-meta { display: flex; align-items: center; gap: 8px; margin: 4px 0 0 24px; font-size: 11px; color: var(--text-muted); }
+@container (max-width: 380px) {
+  .hp-personal-compose-bottom { align-items: stretch; }
+  .hp-personal-compose-bottom .hp-button { width: 100%; }
+  .hp-personal-journal-toolbar { gap: 4px; }
+  .hp-personal-action { min-height: 32px; }
+}

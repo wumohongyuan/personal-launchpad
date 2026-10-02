@@ -13,11 +13,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install build dependencies
+        run: npm ci --prefix home-pages-personal --no-audit --no-fund
+      - name: Check data and upstream integrations
+        run: |
+          npm test
+          npm run test:upstream
+      - name: Build from published source
+        run: npm run build
+      - name: Prepare installation archive
+        run: |
+          npm run package
+          cd release
+          zip -r "personal-launchpad-${GITHUB_REF_NAME}.zip" personal-launchpad
       - name: Publish release assets
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
+          body_path: RELEASE_NOTES.md
+          fail_on_unmatched_files: true
           files: |
             main.js
             manifest.json
             styles.css
+            LICENSE
+            THIRD_PARTY_NOTICES.md
+            release/personal-launchpad-*.zip

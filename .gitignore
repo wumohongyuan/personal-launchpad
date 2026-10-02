@@ -8,3 +8,26 @@
 .obsidian/workspace.json
 .obsidian/workspace-mobile.json
 .obsidian/community-plugins.json
+
+# Local copies and verification output.
+.obsidian/plugins/
+backups/
+release/
+test-results/
+node_modules/
+
+# Superseded 2.x UI retained locally for recovery, not the v3 build.
+/src/
+/design/prototype.css
+/design/icons.js
+/tests/browser.cjs
+/tests/library-browser.cjs
+/tests/workbench-browser.cjs
+/scripts/prepare-v3.cjs
+/scripts/finalize-release.cjs
+# Local metadata and verification output.
+home-pages-personal/.git/
+home-pages-personal/.github/
+home-pages-personal/test-results/
+home-pages-personal/main.js
+*.log

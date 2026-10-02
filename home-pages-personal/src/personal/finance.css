@@ -1,0 +1,81 @@
+.hp-personal-finance{flex:1;min-height:0;min-width:0;overflow:auto;overscroll-behavior:contain;padding:16px 18px 22px;container-type:inline-size;container-name:hp-personal-finance;scrollbar-width:thin;color:var(--text-normal)}
+.hp-personal-finance *{box-sizing:border-box}
+.hp-personal-finance [hidden]{display:none!important}
+.hp-personal-finance .hp-pf-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.hp-personal-finance .hp-pf-month-label{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--hp-muted);min-width:0}
+.hp-personal-finance .hp-pf-month-label input{min-height:38px;width:155px;max-width:100%;font-size:12px;border:1px solid var(--hp-border);border-radius:7px;box-shadow:none;background:var(--background-primary-alt)}
+.hp-personal-finance .hp-pf-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.hp-personal-finance .hp-pf-button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:38px;height:auto;max-width:100%;padding:7px 11px;border:1px solid var(--hp-border);border-radius:7px;box-shadow:none;white-space:normal;font-size:12px;line-height:1.6;cursor:pointer;transition:background .15s,border-color .15s,transform .15s}
+.hp-personal-finance .hp-pf-button.mod-cta{background:var(--hp-accent);color:#fff;border-color:transparent}
+.hp-personal-finance .hp-pf-button:disabled{opacity:.5;cursor:wait}
+.hp-personal-finance .hp-pf-button:focus-visible,.hp-personal-finance input:focus-visible,.hp-personal-finance select:focus-visible,.hp-personal-finance a:focus-visible{outline:2px solid var(--hp-accent);outline-offset:2px}
+.hp-personal-finance .hp-pf-icon{display:inline-flex;flex-shrink:0;align-items:center;justify-content:center}
+.hp-personal-finance .hp-pf-icon svg{width:15px;height:15px}
+.hp-personal-finance .hp-pf-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:22px}
+.hp-personal-finance .hp-pf-stat{min-width:0;padding:17px 18px;background:var(--background-primary-alt);border:1px solid var(--hp-border);border-radius:10px;display:flex;flex-direction:column;gap:10px}
+.hp-personal-finance .hp-pf-stat>span{font-size:11px;color:var(--hp-muted);line-height:1.7}
+.hp-personal-finance .hp-pf-stat strong{font-size:24px;font-weight:600;letter-spacing:-.015em;font-variant-numeric:tabular-nums;line-height:1.5;overflow-wrap:anywhere}
+.hp-personal-finance .hp-pf-stat[data-type="balance"]{background:color-mix(in srgb,var(--hp-accent) 8%,var(--background-primary));border-color:color-mix(in srgb,var(--hp-accent) 22%,transparent)}
+.hp-personal-finance .hp-pf-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 16px;border-bottom:1px solid var(--hp-border);padding-bottom:12px}
+.hp-personal-finance .hp-pf-tabs .hp-pf-button{border-color:transparent;background:transparent;color:var(--hp-muted)}
+.hp-personal-finance .hp-pf-tabs .hp-pf-button[aria-pressed="true"]{background:color-mix(in srgb,var(--hp-accent) 12%,transparent);color:var(--hp-accent);font-weight:600}
+.hp-personal-finance .hp-pf-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.hp-personal-finance .hp-pf-filters select{min-width:0;max-width:100%;height:36px;font-size:11px;box-shadow:none;border:1px solid var(--hp-border);border-radius:7px;background-color:var(--background-primary-alt)}
+.hp-personal-finance .hp-pf-message{font-size:11px;line-height:1.8;color:var(--hp-accent);margin:0 0 14px;overflow-wrap:anywhere}
+.hp-personal-finance .hp-pf-message:empty{display:none}
+.hp-personal-finance .hp-pf-message.is-error{color:var(--text-error)}
+.hp-personal-finance .hp-pf-caption{font-size:11px;line-height:1.8;color:var(--hp-muted);margin:0;overflow-wrap:anywhere}
+.hp-personal-finance .hp-pf-area{min-width:0}
+.hp-personal-finance .hp-pf-area>.hp-pf-button{margin-top:14px}
+.hp-personal-finance .hp-empty{min-height:130px;display:flex;flex-direction:column;gap:9px;background:var(--background-primary-alt);border:1px dashed var(--hp-border);border-radius:9px;font-size:12px;line-height:1.8;text-align:center;padding:20px}
+.hp-personal-finance .hp-empty strong{font-size:13px;font-weight:600;color:var(--text-normal)}
+.hp-personal-finance .hp-pf-entry{padding:16px 0;border-bottom:1px solid var(--hp-border)}
+.hp-personal-finance .hp-pf-entry:last-child{border-bottom:0}
+.hp-personal-finance .hp-pf-entry-top{display:flex;gap:13px;align-items:flex-start;justify-content:space-between;min-width:0}
+.hp-personal-finance .hp-pf-entry-copy{min-width:0;display:flex;flex-direction:column;gap:4px}
+.hp-personal-finance .hp-pf-entry-copy>strong{font-size:14px;font-weight:600;line-height:1.6;overflow-wrap:anywhere}
+.hp-personal-finance .hp-pf-amount{font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.7;text-align:right;min-width:0;max-width:52%;overflow-wrap:anywhere;flex-shrink:0}
+.hp-personal-finance .hp-pf-entry[data-type="income"] .hp-pf-amount{color:var(--hp-accent)}
+.hp-personal-finance .hp-pf-note{font-size:12px;color:var(--hp-muted);line-height:1.85;white-space:pre-wrap;overflow-wrap:anywhere;margin:10px 0 0}
+.hp-personal-finance .hp-pf-row-actions{display:flex;gap:6px 12px;flex-wrap:wrap;align-items:center;margin-top:9px}
+.hp-personal-finance .hp-pf-row-actions .hp-pf-button{min-height:30px;background:transparent;border-color:transparent;padding:4px 1px;color:var(--hp-accent);font-size:11px}
+.hp-personal-finance .hp-pf-row-actions .hp-pf-button:hover{color:var(--text-normal)}
+.hp-personal-finance .hp-pf-link{font-size:11px;display:inline-flex;align-items:center;min-height:30px;color:var(--hp-accent);text-decoration:none}
+.hp-personal-finance .hp-pf-link:hover{text-decoration:underline}
+.hp-personal-finance .hp-pf-subscriptions{display:grid;gap:12px}
+.hp-personal-finance .hp-pf-subscription{padding:15px;border:1px solid var(--hp-border);border-radius:10px;background:var(--background-primary);animation:hp-pf-enter .2s ease both;min-width:0}
+.hp-personal-finance .hp-pf-subscription.is-due{border-color:color-mix(in srgb,var(--hp-accent) 35%,var(--hp-border));background:color-mix(in srgb,var(--hp-accent) 4%,var(--background-primary))}
+.hp-personal-finance .hp-pf-due{display:inline-flex;align-items:center;width:fit-content;max-width:100%;padding:2px 7px;border-radius:5px;background:color-mix(in srgb,var(--hp-accent) 10%,transparent);color:var(--hp-accent);font-size:10px;line-height:1.7;margin-top:10px;overflow-wrap:anywhere}
+.hp-personal-finance .hp-pf-due.is-overdue{color:var(--text-error);background:color-mix(in srgb,var(--text-error) 8%,transparent)}
+.hp-personal-finance .hp-pf-details{margin-top:10px;font-size:11px;color:var(--hp-muted)}
+.hp-personal-finance .hp-pf-details summary{cursor:pointer;min-height:30px;padding:4px 0}
+.hp-personal-finance .hp-pf-details .hp-pf-note{margin-top:3px}
+.hp-personal-finance .hp-pf-footnote{font-size:10px;line-height:1.85;color:var(--hp-muted);margin:17px 0 0;overflow-wrap:anywhere}
+@container hp-personal-finance (max-width:550px){.hp-personal-finance .hp-pf-summary{gap:8px}.hp-personal-finance .hp-pf-stat{padding:13px 12px}.hp-personal-finance .hp-pf-stat strong{font-size:19px}.hp-personal-finance .hp-pf-stat>span{font-size:10px}.hp-personal-finance .hp-pf-toolbar{gap:10px}.hp-personal-finance .hp-pf-amount{font-size:15px}}
+@container hp-personal-finance (max-width:380px){
+  .hp-personal-finance .hp-pf-toolbar{margin-bottom:16px}
+  .hp-personal-finance .hp-pf-month-label{justify-content:space-between;width:100%;font-size:12px}
+  .hp-personal-finance .hp-pf-month-label input{width:175px;min-height:44px;font-size:16px}
+  .hp-personal-finance .hp-pf-actions{width:100%;gap:8px}
+  .hp-personal-finance .hp-pf-actions>.hp-pf-button{flex:1;min-height:44px;font-size:12px}
+  .hp-personal-finance .hp-pf-summary{grid-template-columns:minmax(0,1fr);gap:7px;margin-bottom:17px}
+  .hp-personal-finance .hp-pf-stat{display:flex;flex-direction:row;justify-content:space-between;align-items:center;padding:9px 12px;gap:12px}
+  .hp-personal-finance .hp-pf-stat strong{font-size:19px;text-align:right}
+  .hp-personal-finance .hp-pf-stat>span{font-size:11px;flex-shrink:0}
+  .hp-personal-finance .hp-pf-tabs{gap:5px}
+  .hp-personal-finance .hp-pf-tabs .hp-pf-button{min-height:44px;padding:7px 12px;font-size:12px}
+  .hp-personal-finance .hp-pf-filters{gap:6px}
+  .hp-personal-finance .hp-pf-filters select{height:44px;flex:1;font-size:11px;padding:5px 6px}
+  .hp-personal-finance .hp-pf-entry-top{gap:10px}
+  .hp-personal-finance .hp-pf-entry-copy>strong{font-size:13px}
+  .hp-personal-finance .hp-pf-amount{font-size:15px;max-width:50%}
+  .hp-personal-finance .hp-pf-caption{font-size:10px}
+  .hp-personal-finance .hp-pf-row-actions .hp-pf-button,.hp-personal-finance .hp-pf-link,.hp-personal-finance .hp-pf-details summary{min-height:44px}
+  .hp-personal-finance .hp-pf-row-actions{gap:4px 12px;margin-top:5px}
+  .hp-personal-finance .hp-pf-subscription{padding:13px}
+  .hp-personal-finance .hp-pf-due{font-size:10px}
+  .hp-personal-finance .hp-pf-footnote{font-size:10px}
+}
+@media(pointer:coarse){.hp-personal-finance .hp-pf-button,.hp-personal-finance .hp-pf-row-actions .hp-pf-button,.hp-personal-finance .hp-pf-link,.hp-personal-finance .hp-pf-details summary,.hp-personal-finance .hp-pf-filters select{min-height:44px}.hp-personal-finance .hp-pf-month-label input{font-size:16px;min-height:44px}.hp-personal-finance .hp-pf-filters select{font-size:16px}}
+@keyframes hp-pf-enter{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.hp-personal-finance *,.hp-personal-finance *::before,.hp-personal-finance *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}

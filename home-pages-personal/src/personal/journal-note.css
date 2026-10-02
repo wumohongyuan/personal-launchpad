@@ -1,0 +1,47 @@
+/* Native Markdown callouts. Never apply the workbench class namespace here. */
+.callout[data-callout^="pl-"] {
+  --callout-color: 71, 108, 86;
+  --callout-icon: lucide-pencil;
+  margin: 1.1em 0;
+  padding: 14px 18px 16px;
+  border: 1px solid rgba(var(--callout-color), 0.14);
+  border-left: 3px solid rgba(var(--callout-color), 0.5);
+  border-radius: 5px 12px 12px 5px;
+  background: rgba(var(--callout-color), 0.035);
+  box-shadow: none;
+  mix-blend-mode: normal;
+}
+.callout[data-callout="pl-diary"] { --callout-icon: lucide-book-open; }
+.callout[data-callout="pl-task"] { --callout-icon: lucide-list-todo; }
+.callout[data-callout="pl-focus"] { --callout-icon: lucide-target; }
+.callout[data-callout="pl-review"] { --callout-icon: lucide-history; }
+.callout[data-callout^="pl-"] > .callout-title {
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84em;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--text-muted);
+  padding: 0;
+}
+.callout[data-callout^="pl-"] > .callout-title .callout-title-inner { font-weight: 500; }
+.callout[data-callout^="pl-"] > .callout-title .callout-icon {
+  display: flex;
+  color: rgb(var(--callout-color));
+}
+.callout[data-callout^="pl-"] > .callout-title .callout-icon svg { width: 16px; height: 16px; }
+.callout[data-callout^="pl-"] > .callout-content {
+  margin-top: 9px;
+  color: var(--text-normal);
+  line-height: 1.85;
+  overflow-wrap: anywhere;
+}
+.callout[data-callout^="pl-"] > .callout-content > :first-child { margin-top: 0; }
+.callout[data-callout^="pl-"] > .callout-content > :last-child { margin-bottom: 0; }
+.callout[data-callout^="pl-"] > .callout-content p { margin: 0.65em 0; }
+.callout[data-callout^="pl-"] > .callout-content h3 { font-size: 1em; margin: 1.2em 0 0.4em; }
+.callout[data-callout^="pl-"] > .callout-content ul { margin-top: 0.4em; margin-bottom: 0.4em; }
+.theme-dark .callout[data-callout^="pl-"] {
+  --callout-color: 148, 184, 156;
+  background: rgba(var(--callout-color), 0.055);
+}

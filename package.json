@@ -1,0 +1,14 @@
+{
+  "name": "personal-launchpad",
+  "version": "3.0.0",
+  "private": true,
+  "description": "基于 Home Pages 的个人工作台：自由布局、随手记、日记、图书馆、成长与知识库。",
+  "scripts": {
+    "build": "node scripts/build.cjs",
+    "preview": "node scripts/preview-server.cjs",
+    "test": "node --test tests/*.test.cjs home-pages-personal/tests/finance.test.cjs home-pages-personal/tests/personal-lifecycle-finance.test.cjs",
+    "test:upstream": "npm --prefix home-pages-personal test",
+    "package": "node scripts/package.cjs"
+  },
+  "license": "GPL-3.0-only"
+}

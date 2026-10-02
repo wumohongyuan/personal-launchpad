@@ -1,0 +1,26 @@
+/* Personal features extend Home Pages' native design tokens and card structure. */
+.hp-personal-form {width:min(680px,calc(100vw - 32px));}
+.hp-personal-field {display:grid;gap:8px;margin:18px 0;}
+.hp-personal-field label {font-weight:600;font-size:14px;}
+.hp-personal-field input,.hp-personal-field textarea,.hp-personal-field select {width:100%;min-height:40px;border-radius:8px;box-sizing:border-box;}
+.hp-personal-field textarea {min-height:170px;line-height:1.8;padding:12px;resize:vertical;}
+.hp-personal-field small {color:var(--text-muted);font-size:12px;line-height:1.6;}
+.hp-personal-error {color:var(--text-error);font-size:13px;min-height:20px;}
+.hp-personal-form .hp-modal-footer {display:flex;justify-content:flex-end;gap:10px;}
+.hp-personal-form .hp-button {min-height:40px;}
+.hp-view .hp-personal-recovery {padding:36px;max-width:650px;margin:auto;}
+.hp-view .hp-personal-recovery p {line-height:1.8;}
+.hp-personal-header-actions {display:flex;gap:8px;align-items:center;margin-left:auto;}
+.hp-root>.hp-tabs .hp-personal-edit {margin-left:auto;}
+@media(pointer:coarse) {
+  .hp-view .hp-tab,.hp-view .hp-card-action,.hp-view .hp-card-gear,.hp-view .hp-editbtn,.hp-view .hp-card-resize {min-height:44px;min-width:44px;}
+  .hp-view input,.hp-view textarea,.hp-view select {font-size:16px;}
+  .hp-personal-form input,.hp-personal-form textarea,.hp-personal-form select {font-size:16px;min-height:44px;}
+  .hp-personal-form .hp-button {min-height:44px;}
+}
+@media(max-width:600px) {.hp-personal-form input,.hp-personal-form textarea,.hp-personal-form select {font-size:16px;min-height:44px;}.hp-personal-form .hp-button {min-height:44px;}}
+@media(prefers-reduced-motion:no-preference) {
+  .hp-personal-form {animation:hp-personal-appear 160ms ease-out;}
+  .hp-card-personal-library .hp-card-body,.hp-card-personal-journal .hp-card-body {animation:hp-personal-appear 180ms ease-out;}
+  @keyframes hp-personal-appear {from {opacity:0;transform:translateY(5px);} to {opacity:1;transform:translateY(0);}}
+}
