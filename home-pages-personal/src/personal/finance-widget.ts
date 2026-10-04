@@ -3,6 +3,9 @@ import type { WidgetContext, WidgetDefinition } from "../widgets/types";
 import { clampInt } from "../widgets/types";
 import type { FormField, PersonalServices } from "./services";
 
+import type HomePagesPlugin from "../main";
+const {overview,calendar}=require("./data/finance-overview");
+
 type Config = Record<string, unknown>;
 interface Entry { id: string; type: "income" | "expense"; amount: number; date: string; category: string; note: string; archived?: boolean; subscriptionId?: string }
 interface Subscription { id: string; name: string; amount: number; cycle: string; nextDue: string; remindDays: number; url: string; note: string; active: boolean; archived?: boolean }
@@ -86,7 +89,7 @@ class FinancePanel {
     for (const [key, text] of choices) { const option = el(input, "option", "", text); option.value = key; }
     input.value = value; input.addEventListener("change", () => { onChange(input.value); this.shown = this.limit; void this.refresh(); });
   }
-  private async form(title: string, fields: FormField[], commit: (values: Record<string, string>) => Promise<unknown>): Promise<Record<string, string> | null> {
+  private async form(title: string, fields: FormField[], commit: (values: Record<string, string>) => Promise<unknown>|unknown): Promise<Record<string, string> | null> {
     this.forms++;
     try { return await this.personal.form(title, fields, commit); }
     finally { this.forms--; if (!this.forms && this.pending && this.alive()) { this.pending = false; void this.refresh(); } }
@@ -131,6 +134,7 @@ class FinancePanel {
         el(copy, "strong", "", entry.category); el(copy, "span", "hp-pf-caption", `${entry.date} · ${entry.type === "income" ? "收入" : "支出"}${entry.subscriptionId ? " · 订阅续费" : ""}`);
         el(top, "span", "hp-pf-amount", `${entry.type === "income" ? "+" : "−"} ¥ ${money(entry.amount)}`);
         if (entry.note) el(row, "p", "hp-pf-note", entry.note);
+        if(entry.archived){this.button(row,"恢复账目",async()=>{await this.personal.finance.restoreEntry(entry.id);this.report("账目已恢复，重新计入汇总。");await this.refresh();});}
         if (!entry.archived) {
           const actions = el(row, "div", "hp-pf-row-actions"); this.button(actions, "编辑", () => this.editEntry(entry));
           this.button(actions, "归档", async () => { await this.personal.finance.archiveEntry(entry.id); this.report("账目已归档，不再计入汇总，可在已归档中查看。"); await this.refresh(); });
@@ -141,6 +145,10 @@ class FinancePanel {
   }
 
   private renderSubscriptions(state: State): void {
+    const totals=overview(state.subscriptions),stats=el(this.area,"div","hp-pf-summary hp-renewal-overview");
+    for(const [label,value] of [["未来 7 天",totals.seven],["未来 30 天",totals.thirty],["订阅月均",totals.monthly],["当前逾期",totals.overdue]] as Array<[string,number]>){const row=el(stats,"div","hp-pf-stat");el(row,"span","",label);el(row,"strong","",`¥ ${money(value)}`);}
+    el(this.area,"p","hp-pf-caption","未来费用含今天，按当前价格估算；月均不含一次性服务，每周订阅按一年 52 期折算。");
+    this.button(this.area,"导出日历提醒",async()=>{const path=`${this.personal.settings.legacyFolder}/导出/续费提醒-${today()}-${id().slice(0,6)}.ics`;await this.personal.store.ensureFolder(path.slice(0,path.lastIndexOf("/")));await this.ctx.app.vault.create(path,calendar(state.subscriptions));this.report(`已导出到 ${path}。将文件导入系统日历，包含未来 365 天账期及上午 9 点提醒。此文件不会自动更新，变更订阅后请重新导出。`);},"calendar-days");
     this.select(this.filters, "订阅状态", [["active", "启用中"], ["due", "近期到期 / 逾期"], ["inactive", "已停用"], ["all", "全部订阅"], ["archived", "已归档"]], this.subscriptionState, value => { this.subscriptionState = value; });
     const subscriptions = state.subscriptions.filter(item => this.subscriptionState === "archived" ? item.archived : !item.archived && (this.subscriptionState === "all" || this.subscriptionState === "inactive" && !item.active || this.subscriptionState === "active" && item.active || this.subscriptionState === "due" && item.active && daysUntil(item.nextDue) <= item.remindDays)).sort((a, b) => a.nextDue.localeCompare(b.nextDue));
     if (!subscriptions.length) this.empty(this.area, "这里暂时没有对应的会员或订阅。", "添加服务名称、费用和下次到期日，把续费时间放在一起。");
@@ -154,6 +162,7 @@ class FinancePanel {
       el(top, "span", "hp-pf-amount", `¥ ${money(subscription.amount)}`);
       const badge = el(row, "span", "hp-pf-due", dueLabel); badge.classList.toggle("is-overdue", subscription.active && remaining < 0 && !subscription.archived);
       if (subscription.note) { const details = el(row, "details", "hp-pf-details"); el(details, "summary", "", "备注"); el(details, "p", "hp-pf-note", subscription.note); }
+      if(subscription.archived){this.button(row,"恢复订阅",async()=>{await this.personal.finance.restoreSubscription(subscription.id);this.report("订阅已恢复为停用状态，可编辑后启用。");await this.refresh();});}
       if (!subscription.archived) {
         const actions = el(row, "div", "hp-pf-row-actions");
         if (subscription.active) this.button(actions, "登记已缴费", async () => { const result = await this.personal.finance.paySubscription(subscription.id, subscription.nextDue); this.report(result.alreadyPaid ? "这个账期已经登记过，没有重复记账。" : subscription.cycle === "once" ? "已记录支出，一次性服务已停用。" : `已记录支出，下次到期 ${result.subscription.nextDue}。`); await this.refresh(); }, "check");
@@ -171,20 +180,7 @@ class FinancePanel {
   private empty(parent: HTMLElement, title: string, caption: string): void { const box = el(parent, "div", "hp-empty"); el(box, "strong", "", title); el(box, "span", "", caption); }
 
   private async editEntry(entry?: Entry): Promise<void> {
-    const entryId = entry?.id || id();
-    const group = entry ? undefined : "日期、收支类型与备注";
-    let lastCategory = "";
-    try { lastCategory = this.personal.readDraft("finance:last-category"); } catch { /* A preference never blocks a ledger entry. */ }
-    const result = await this.form(entry ? "编辑账目" : "记一笔收支", [
-      { key: "amount", label: "金额（元）", type: "number", value: entry ? (entry.amount / 100).toFixed(2) : "", hint: entry ? "人民币，最多两位小数。" : "默认记为今天的支出；展开下方选项可改为收入或补记其他日期。" },
-      { key: "category", label: "分类", value: entry?.category ?? lastCategory, hint: "餐饮、交通、学习……也可以填写自己的分类。" },
-      { key: "type", label: "收支类型", value: entry?.type || "expense", options: entry?.subscriptionId ? [["expense", "支出（订阅续费）"]] : [["expense", "支出"], ["income", "收入"]], group },
-      { key: "date", label: "日期", type: "date", value: entry?.date || today(), group },
-      { key: "note", label: "备注（可选）", value: entry?.note || "", multiline: true, group }
-    ], async values => {
-      await this.personal.finance.saveEntry({ ...values, id: entryId });
-      try { this.personal.writeDraft("finance:last-category", values.category.trim()); } catch { /* Ledger was saved successfully. */ }
-    });
+    const result=await entryForm(this.personal,entry,(title,fields,commit)=>this.form(title,fields,commit));
     if (result && this.alive()) { this.report("账目已保存。"); await this.refresh(); }
   }
 
@@ -216,3 +212,22 @@ export const personalFinanceWidget: WidgetDefinition<Record<string, unknown>> = 
     new Setting(container).setName("每次显示条数").addSlider(slider => slider.setLimits(3, 100, 1).setDynamicTooltip().setValue(clampInt(ctx.config.displayCount, 3, 100, 12)).onChange(value => ctx.update({ displayCount: value })));
   }
 };
+
+async function entryForm(personal:PersonalServices,entry?:Entry,form:PersonalServices["form"]=personal.form.bind(personal)):Promise<Record<string,string>|null>{
+    const entryId = entry?.id || id();
+    const group = entry ? undefined : "日期、收支类型与备注";
+    let lastCategory = "";
+    try { lastCategory = personal.readDraft("finance:last-category"); } catch { /* A preference never blocks a ledger entry. */ }
+    const result = await form(entry ? "编辑账目" : "记一笔收支", [
+      { key: "amount", label: "金额（元）", type: "number", value: entry ? (entry.amount / 100).toFixed(2) : "", hint: entry ? "人民币，最多两位小数。" : "默认记为今天的支出；展开下方选项可改为收入或补记其他日期。" },
+      { key: "category", label: "分类", value: entry?.category ?? lastCategory, hint: "餐饮、交通、学习……也可以填写自己的分类。" },
+      { key: "type", label: "收支类型", value: entry?.type || "expense", options: entry?.subscriptionId ? [["expense", "支出（订阅续费）"]] : [["expense", "支出"], ["income", "收入"]], group },
+      { key: "date", label: "日期", type: "date", value: entry?.date || today(), group },
+      { key: "note", label: "备注（可选）", value: entry?.note || "", multiline: true, group }
+    ], async values => {
+      await personal.finance.saveEntry({ ...values, id: entryId });
+      try { personal.writeDraft("finance:last-category", values.category.trim()); } catch { /* Ledger was saved successfully. */ }
+    });
+  return result;
+}
+export async function quickFinance(plugin:HomePagesPlugin):Promise<void>{if(await entryForm(plugin.personal)){plugin.personal.refresh("personal-finance");new Notice("账目已保存。");}}

@@ -12,7 +12,7 @@ async function build() {
   run("esbuild.config.mjs", "production");
   run("scripts/verify-bundle.mjs");
   for (const file of ["main.js", "manifest.json"]) fs.copyFileSync(path.join(fork,file),path.join(root,file));
-  const styles = ["styles.css", "src/personal/personal.css", "src/personal/journal-widgets.css", "src/personal/library.css", "src/personal/growth-widgets.css", "src/personal/finance.css", "src/personal/journal-note.css", "src/personal/appearance.css", "src/personal/liquid-glass.css", "src/personal/appearance-editor.css", "src/personal/simplified-controls.css"];
+  const styles = ["styles.css", "src/personal/personal.css", "src/personal/journal-widgets.css", "src/personal/library.css", "src/personal/growth-widgets.css", "src/personal/finance.css", "src/personal/journal-note.css", "src/personal/appearance.css", "src/personal/liquid-glass.css", "src/personal/appearance-editor.css", "src/personal/simplified-controls.css", "src/personal/everyday-upgrades.css"];
   fs.writeFileSync(path.join(root,"styles.css"), "/* Personal Launchpad 3 — Home Pages fork, GPL-3.0-only. */\n" + styles.map(file => `\n/* ${file} */\n${fs.readFileSync(path.join(fork,file),"utf8")}`).join("\n"));
   await esbuild.build({ entryPoints:[path.join(fork,"tests/personal-preview.ts")], bundle:true, platform:"browser",format:"iife",target:"es2020",alias:{obsidian:path.join(fork,"tests/personal-obsidian-stub.ts")},outfile:path.join(root,"design/preview.js"),minify:true });
   const base = fs.readFileSync(path.join(fork,"tests/personal-preview.css"),"utf8");

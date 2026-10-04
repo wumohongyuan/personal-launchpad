@@ -8,6 +8,7 @@ import { HomeView, VIEW_TYPE_HOME } from "./view";
 import { CustomWidgetManager, DeleteCustomWidgetSuggestModal, PasteWidgetModal } from "./widgets/userLoader";
 import { PersonalServices, personalSettings } from "./personal/services";
 import { createPersonalPages } from "./personal/defaults";
+import { quickCapture, openDrafts } from "./personal/quick-capture";
 import { RenewalReminders } from "./personal/renewal-reminders";
 
 type SettingApp = { setting?: { open: () => void; openTabById: (id: string) => void } };
@@ -43,7 +44,8 @@ export default class HomePagesPlugin extends Plugin {
     this.addCommand({id:"open-personal-library",name:"打开图书馆",callback:()=>void this.openPersonalPage("图书馆")});
     this.addCommand({id:"open-personal-journal",name:"打开日记",callback:()=>void this.openPersonalPage("日记")});
     this.addCommand({id:"open-personal-finance",name:"打开账本与续费提醒",callback:()=>void this.openPersonalPage("账本")});
-    this.addCommand({id:"quick-capture",name:"随手记一条",callback:()=>void this.openPersonalPage("工作台",true)});
+    this.addCommand({id:"quick-capture",name:"随手记一条",callback:()=>void this.ready.then(()=>{if(this.active)void quickCapture(this);})});
+    this.addCommand({id:"open-shared-drafts",name:"打开跨设备草稿箱",callback:()=>void this.ready.then(()=>{if(this.active)openDrafts(this);})});
     this.addCommand({id:"repair-personal-home",name:"重新打开主页（恢复视图）",callback:()=>void this.openHome()});
     this.addCommand({
       id: "toggle-edit-layout",

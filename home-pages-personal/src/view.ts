@@ -11,6 +11,9 @@ import type { WidgetContext } from "./widgets/types";
 import { animateLayout, moveBefore, PointerSorter } from "./ui/sortable";
 import { accentInk, appearanceFor, COLOR_FIELDS, glassOpacity, openAppearanceEditor, sanitizeColors, widgetColorsFor } from "./personal/appearance-editor";
 
+import { mountQuickDock, openDrafts, quickCapture } from "./personal/quick-capture";
+import { layoutsFor } from "./personal/device-layout";
+
 export const VIEW_TYPE_HOME = "personal-launchpad-view";
 const REFRESH_DEBOUNCE_MS = 900;
 
@@ -171,6 +174,7 @@ export class HomeView extends ItemView {
     this.tabsEl = this.rootEl.createDiv({ cls: "hp-tabs",attr:{"aria-label":"个人空间页面"} });
     this.toolbarEl = this.rootEl.createDiv({ cls: "hp-toolbar" });
     this.gridEl = this.rootEl.createDiv({ cls: "hp-grid" });
+    this.register(mountQuickDock(this.plugin,this.contentEl));
 
     this.addAction("refresh-cw", "刷新", () => this.refreshWidgets());
     this.addAction("pencil", "编辑布局", () => this.toggleEditing());
@@ -221,6 +225,7 @@ export class HomeView extends ItemView {
   applyLayout(): void {
     if(this.closed||!this.rootEl||!this.plugin.active)return;
     const { rowHeight, gap, maxWidth } = this.plugin.settings;
+    this.contentEl.setAttribute("data-hp-device",layoutsFor(this.plugin).profile);
     const visual=appearanceFor(this.plugin);
     const appearance=visual.appearance||"dark";
     this.contentEl.setAttribute("data-hp-appearance",appearance);
@@ -240,7 +245,7 @@ export class HomeView extends ItemView {
     this.contentEl.toggleClass("theme-dark",appearance==="dark");
     this.contentEl.toggleClass("theme-light",appearance==="light");
     this.rootEl.style.setProperty("--hp-row", `${rowHeight}px`);
-    this.rootEl.style.setProperty("--hp-gap", `${gap}px`);
+    this.rootEl.style.setProperty("--hp-gap", `${visual.gap??gap}px`);
     this.rootEl.style.setProperty("--hp-max-width", maxWidth > 0 ? `${maxWidth}px` : "none");
     this.rootEl.toggleClass("is-editing", this.editing);
     for(const host of this.hosts.values())this.applyCardAppearance(host.cardEl,host.widget);
@@ -268,7 +273,7 @@ export class HomeView extends ItemView {
       });
     }
     const capture=this.tabsEl.createEl("button",{cls:"hp-tab hp-personal-quick-capture",text:"随手记",attr:{type:"button",title:"跳到记录输入框"}});
-    capture.addEventListener("click",()=>void this.focusCapture());
+    capture.addEventListener("click",()=>void quickCapture(this.plugin));
     const customize=this.tabsEl.createEl("button",{cls:"hp-tab hp-customize-button",text:"自定义",attr:{type:"button","aria-haspopup":"menu"}});
     customize.addEventListener("click",()=>this.showCustomization(customize));
     if (this.editing) {
@@ -282,6 +287,8 @@ export class HomeView extends ItemView {
     menu.addItem(item=>item.setTitle(this.editing ? "完成布局调整" : "调整布局").setIcon("layout-dashboard").onClick(()=>this.toggleEditing()));
     menu.addItem(item=>item.setTitle("外观与配色").setIcon("palette").onClick(()=>openAppearanceEditor(this.plugin)));
     menu.addItem(item=>item.setTitle("添加组件").setIcon("plus").onClick(()=>this.promptAddWidget()));
+    menu.addItem(item=>item.setTitle("跨设备草稿箱").setIcon("notebook-pen").onClick(()=>openDrafts(this.plugin)));
+    menu.addItem(item=>item.setTitle("设备布局与恢复").setIcon("monitor-smartphone").onClick(()=>layoutsFor(this.plugin).open(this.page)));
     menu.addSeparator();
     menu.addItem(item=>item.setTitle("新建页面").setIcon("file-plus").onClick(()=>{
       new PromptModal(this.app, { title: "新建页面", placeholder: "页面名称" }, async name=>{
@@ -311,13 +318,14 @@ export class HomeView extends ItemView {
     if (!this.editing) return;
     const hint = this.toolbarEl.createDiv({ cls: "hp-toolbar-hint" });
     setIcon(hint.createSpan({ cls: "hp-toolbar-hint-icon" }), "move");
-    hint.createSpan({ text: "拖动卡片标题或页面标签调整顺序，拖右下角手柄调整尺寸（均支持触屏）；齿轮配置内容。" });
+    hint.createSpan({ text: `正在调整${layoutsFor(this.plugin).label}布局。拖动标题排序、拖右下角调整尺寸；齿轮配置内容。` });
     const actions = this.toolbarEl.createDiv({ cls: "hp-toolbar-actions" });
     const add = actions.createEl("button", { cls: "hp-button", attr: { type: "button" } });
     setIcon(add.createSpan({ cls: "hp-button-icon" }), "plus");
     add.createSpan({ text: "添加组件" });
     add.addEventListener("click", () => this.promptAddWidget());
 
+    const undo=actions.createEl("button",{cls:"hp-button hp-layout-undo",text:"撤销布局",attr:{type:"button"}});undo.disabled=!layoutsFor(this.plugin).canUndo;undo.addEventListener("click",()=>{layoutsFor(this.plugin).undo();this.render();});
     const done = actions.createEl("button", { cls: "hp-button mod-cta", attr: { type: "button" } });
     setIcon(done.createSpan({ cls: "hp-button-icon" }), "check");
     done.createSpan({ text: "完成" });
@@ -330,7 +338,7 @@ export class HomeView extends ItemView {
     for (const host of this.hosts.values()) host.dispose();
     this.hosts.clear();
     this.gridEl.empty();
-    const widgets = this.page.widgets;
+    const widgets = layoutsFor(this.plugin).widgets(this.page);
     if (widgets.length === 0) {
       const empty = this.gridEl.createDiv({ cls: "hp-grid-empty" });
       setIcon(empty.createDiv({ cls: "hp-grid-empty-icon" }), "layout-dashboard");
@@ -382,9 +390,10 @@ export class HomeView extends ItemView {
     return host;
   }
 
-  private applyCardSize(card: HTMLElement, widget: WidgetInstance): void {
-    const w = Math.min(MAX_COLUMNS, Math.max(1, widget.w));
-    const h = Math.min(MAX_ROWS, Math.max(1, widget.h));
+  private applyCardSize(card: HTMLElement, widget: WidgetInstance, temporary=false): void {
+    const size=temporary?widget:layoutsFor(this.plugin).size(widget);
+    const w = Math.min(MAX_COLUMNS, Math.max(1, size.w));
+    const h = Math.min(MAX_ROWS, Math.max(1, size.h));
     card.setAttribute("data-w", String(w));
     card.setAttribute("data-h", String(h));
     card.style.setProperty("--hp-card-w", String(w));
@@ -421,12 +430,12 @@ export class HomeView extends ItemView {
     const width = group();
     width.createSpan({ cls: "hp-editbtn-label", text: "宽" });
     width.appendChild(button("minus", "减小宽度", () => void this.resizeWidget(widget.id, -1, 0)));
-    width.createSpan({ cls: "hp-editbtn-value", text: String(widget.w) });
+    width.createSpan({ cls: "hp-editbtn-value", text: String(layoutsFor(this.plugin).size(widget).w) });
     width.appendChild(button("plus", "增加宽度", () => void this.resizeWidget(widget.id, 1, 0)));
     const height = group();
     height.createSpan({ cls: "hp-editbtn-label", text: "高" });
     height.appendChild(button("minus", "减小高度", () => void this.resizeWidget(widget.id, 0, -1)));
-    height.createSpan({ cls: "hp-editbtn-value", text: String(widget.h) });
+    height.createSpan({ cls: "hp-editbtn-value", text: String(layoutsFor(this.plugin).size(widget).h) });
     height.appendChild(button("plus", "增加高度", () => void this.resizeWidget(widget.id, 0, 1)));
     const misc = group();
     misc.appendChild(button("settings", "配置", () => this.openWidgetSettings(widget.id)));
@@ -443,6 +452,7 @@ export class HomeView extends ItemView {
     this.stopResize?.();
     this.cardSorter?.cancel();
     this.tabSorter?.cancel();
+    if(next)layoutsFor(this.plugin).checkpoint();
     this.editing = next;
     this.rootEl.toggleClass("is-editing", this.editing);
     this.renderTabs();
@@ -474,7 +484,7 @@ export class HomeView extends ItemView {
     page.widgets.push(widget);
     void this.plugin.saveSettings().then(() => {
       if(this.closed||this.page.id!==page.id||!this.plugin.active)return;
-      if (page.widgets.length === 1) this.renderGrid();
+      if (this.hosts.size === 0) this.renderGrid();
       else this.createCard(widget);
       this.updateHeader();
       this.openWidgetSettings(widget.id);
@@ -485,8 +495,9 @@ export class HomeView extends ItemView {
     const page = this.page;
     const widget = page.widgets.find((item) => item.id === id);
     if (!widget) return;
-    const initial = { kind: widget.kind, title: widget.title, w: widget.w, h: widget.h, config: JSON.stringify(normalizeWidgetConfig(widget)) };
-    new WidgetSettingsModal(this.app, this.plugin, widget, async (updated) => {
+    const size=layoutsFor(this.plugin).size(widget);
+    const initial = { kind: widget.kind, title: widget.title, ...size, config: JSON.stringify(normalizeWidgetConfig(widget)) };
+    new WidgetSettingsModal(this.app, this.plugin, {...widget,...size}, async (updated) => {
       const index = page.widgets.findIndex((item) => item.id === id);
       if (index < 0 || !this.plugin.active) throw new Error("组件已关闭，请重新打开后保存。");
       const previous = page.widgets[index];
@@ -507,9 +518,11 @@ export class HomeView extends ItemView {
       else if (initial.config !== JSON.stringify(normalizeWidgetConfig(previous))) {
         throw new Error("组件内容在配置期间已更新，请重新打开配置后修改。配色预览仍保留。");
       }
+      const desiredSize={w:updated.w,h:updated.h};updated.w=previous.w;updated.h=previous.h;
       page.widgets[index] = updated;
       try { await this.plugin.saveSettings(); }
       catch (error) { page.widgets[index] = previous; throw error; }
+      layoutsFor(this.plugin).resize(id,desiredSize.w,desiredSize.h);
       if (!this.closed && this.plugin.active && this.page.id === page.id) this.replaceCard(updated);
     }).open();
   }
@@ -532,37 +545,39 @@ export class HomeView extends ItemView {
   private async resizeWidget(id: string, dw: number, dh: number): Promise<void> {
     const widget = this.page.widgets.find((item) => item.id === id);
     if (!widget) return;
-    await this.setWidgetSize(id, widget.w + dw, widget.h + dh);
+    const size=layoutsFor(this.plugin).size(widget);
+    await this.setWidgetSize(id, size.w + dw, size.h + dh);
   }
 
   private async setWidgetSize(id: string, w: number, h: number): Promise<void> {
     const widget = this.page.widgets.find((item) => item.id === id);
     if (!widget) return;
-    widget.w = clampSpan(w, MAX_COLUMNS);
-    widget.h = clampSpan(h, MAX_ROWS);
+    layoutsFor(this.plugin).resize(id,w,h);
     const host = this.hosts.get(id);
     if (host) {
       this.animateCards(() => this.applyCardSize(host.cardEl, widget));
       this.renderEditBar(host.cardEl, widget);
     }
-    await this.plugin.saveSettings();
+    this.renderToolbar();
   }
 
   private async moveWidget(id: string, delta: number): Promise<void> {
-    const widgets = this.page.widgets;
+    const widgets = layoutsFor(this.plugin).widgets(this.page);
     const index = widgets.findIndex((item) => item.id === id);
     const target = index + delta;
     if (index < 0 || target < 0 || target >= widgets.length) return;
     [widgets[index], widgets[target]] = [widgets[target], widgets[index]];
+    layoutsFor(this.plugin).order(this.page,widgets.map(w=>w.id));
     this.animateCards(() => this.reorderCards());
-    await this.plugin.saveSettings();
+    this.renderToolbar();
   }
 
   private async reorderWidget(id: string, beforeId: string | null): Promise<void> {
-    const widgets = this.page.widgets;
+    const widgets = layoutsFor(this.plugin).widgets(this.page);
     if (!moveBefore(widgets, id, beforeId)) return;
+    layoutsFor(this.plugin).order(this.page,widgets.map(w=>w.id));
     this.reorderCards();
-    await this.plugin.saveSettings();
+    this.renderToolbar();
   }
 
   /** 改布局时让其它卡片从原位置平滑滑到新位置（系统要求减少动态效果时直接跳变）。 */
@@ -572,7 +587,7 @@ export class HomeView extends ItemView {
 
   /** 按 widgets 数组顺序重新排列已存在的卡片 DOM，不重绘内容。 */
   private reorderCards(): void {
-    for (const widget of this.page.widgets) {
+    for (const widget of layoutsFor(this.plugin).widgets(this.page)) {
       const host = this.hosts.get(widget.id);
       if (host) this.gridEl.appendChild(host.cardEl);
     }
@@ -595,15 +610,15 @@ export class HomeView extends ItemView {
   private removeWidget(id: string): void {
     const widget = this.page.widgets.find((item) => item.id === id);
     if (!widget) return;
-    new ConfirmModal(this.app, { title: "删除组件", message: `确定删除“${widgetDisplayTitle(widget)}”？`, confirmText: "删除", danger: true }, async () => {
+    new ConfirmModal(this.app, { title: "删除组件", message: `从本机布局移除“${widgetDisplayTitle(widget)}”？其他设备和记录保留，可在「设备布局与恢复」中撤销或重新显示。`, confirmText: "删除", danger: true }, async () => {
       const page = this.page;
-      page.widgets = page.widgets.filter((item) => item.id !== id);
-      await this.plugin.saveSettings();
+      layoutsFor(this.plugin).hide(id,true);
+      this.renderToolbar();
       const host = this.hosts.get(id);
       host?.dispose();
       host?.cardEl.remove();
       this.hosts.delete(id);
-      if (page.widgets.length === 0) this.renderGrid();
+      if (layoutsFor(this.plugin).widgets(page).length === 0) this.renderGrid();
     }).open();
   }
 
@@ -718,7 +733,8 @@ export class HomeView extends ItemView {
       const step = delta[event.key];
       if (!widget || !step) return;
       event.preventDefault();
-      void this.setWidgetSize(id, widget.w + step[0], widget.h + step[1]);
+      const size=layoutsFor(this.plugin).size(widget);
+      void this.setWidgetSize(id, size.w + step[0], size.h + step[1]);
     });
     handle.addEventListener("pointerdown", (event) => {
       if (!this.editing || event.button !== 0 || !event.isPrimary || this.stopResize) return;
@@ -733,8 +749,8 @@ export class HomeView extends ItemView {
       const colUnit = (parseFloat(tracks[0]) || 0) + (parseFloat(grid.columnGap) || 0);
       const rowUnit = (parseFloat(grid.gridAutoRows) || this.plugin.settings.rowHeight) + (parseFloat(grid.rowGap) || 0);
       const lockWidth = tracks.length !== MAX_COLUMNS || colUnit <= 0;
-      const start = { x: event.clientX, y: event.clientY, w: widget.w, h: widget.h };
-      let size = { w: widget.w, h: widget.h };
+      const start = { x: event.clientX, y: event.clientY, ...layoutsFor(this.plugin).size(widget) };
+      let size = { w: start.w, h: start.h };
 
       const badge = card.createDiv({ cls: "hp-card-size-badge" });
       // 虚线框逐像素跟着指针，卡片本身按列 / 行吸附，其它卡片平滑让位。
@@ -750,7 +766,7 @@ export class HomeView extends ItemView {
       };
       const paint = (): void => {
         badge.setText(lockWidth ? `高 ${size.h} 行` : `${size.w} 列 × ${size.h} 行`);
-        this.animateCards(() => this.applyCardSize(card, { ...widget, ...size }));
+        this.animateCards(() => this.applyCardSize(card, { ...widget, ...size }, true));
       };
       card.addClass("is-resizing");
       this.rootEl.addClass("is-resizing");

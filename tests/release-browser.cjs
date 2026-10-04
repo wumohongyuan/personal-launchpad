@@ -27,7 +27,8 @@ const root=path.resolve(__dirname,".."),out=path.join(root,"test-results");fs.mk
       assert.notEqual(await page.locator('.hp-view').evaluate(el=>getComputedStyle(el).backgroundColor),darkBackground,'Theme changes actual workbench surfaces');
       await page.screenshot({path:path.join(out,`v3-finance-light-${width}.png`)});
       await page.locator(".hp-tabs").getByRole("button",{name:"随手记",exact:true}).click();
-      await page.waitForFunction(()=>document.activeElement?.classList.contains('hp-personal-compose-input'));
+      await page.getByRole('dialog').getByLabel('想记下的内容',{exact:true}).waitFor();
+      await page.waitForFunction(()=>document.activeElement?.tagName==='TEXTAREA'&&!!document.activeElement.closest('.hp-personal-form'));
       assert.deepEqual(errors,[],`${width} runtime errors`);result.push({width,pages:6,clockSeconds:true,overflow:false,errors});await context.close();
     }
     fs.writeFileSync(path.join(out,"v3-release-browser.json"),JSON.stringify(result,null,2));console.log("PASS actual published bundle: all 6 pages at 375/768/1024/1440, touch, dark mode, seconds clock and zero runtime errors.");

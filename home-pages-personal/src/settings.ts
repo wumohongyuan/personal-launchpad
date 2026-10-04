@@ -8,7 +8,7 @@ import { createWidgetInstance, isWidgetKind } from "./widgets/registry";
 import { PasteWidgetModal } from "./widgets/userLoader";
 import { PersonalServices, personalSettings } from "./personal/services";
 import { createPersonalPages } from "./personal/defaults";
-import { glassOpacity, openAppearanceEditor, sanitizeColors } from "./personal/appearance-editor";
+import { cleanPresets, glassOpacity, openAppearanceEditor, sanitizeColors } from "./personal/appearance-editor";
 
 export const SETTINGS_VERSION = 1;
 
@@ -87,6 +87,7 @@ export function sanitizeSettings(raw: unknown): HomePagesSettings {
     ? value.pages.map((page, index) => sanitizePage(page, `页面 ${index + 1}`)).filter((page): page is HomePage => page !== null)
     : [];
   const settings: HomePagesSettings = {
+    appearancePresets: cleanPresets(value.appearancePresets),
     appearance: value.appearance === "light" || value.appearance === "system" ? value.appearance : "dark",
     material: value.material === "solid" ? "solid" : "glass",
     materialOpacity: glassOpacity(value.materialOpacity),

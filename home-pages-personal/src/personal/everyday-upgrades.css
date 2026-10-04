@@ -1,0 +1,41 @@
+/* Local device controls, portable appearance recipes, quick input and reading. */
+.hp-view { scroll-padding-bottom: 110px; }
+.hp-quick-dock { display:none; }
+.hp-modal.hp-personal-form { max-height:calc(var(--hp-viewport-height,100dvh) - 28px); }
+.hp-personal-form .modal-content { overflow:auto; scroll-padding-bottom:90px; }
+.hp-personal-form .hp-modal-footer { position:sticky; bottom:0; padding:12px 0 max(12px,env(safe-area-inset-bottom)); background:var(--background-primary); z-index:2; }
+.hp-personal-form textarea { max-height:34dvh; }
+.hp-modal.hp-device-layout .setting-item { gap:12px; }
+.hp-modal .hp-quick-choice,.hp-modal .hp-image-picker button { display:block; width:100%; min-height:48px; height:auto; margin:8px 0; padding:12px; text-align:left; white-space:normal; overflow-wrap:anywhere; }
+.hp-modal .hp-draft-row { border-bottom:1px solid var(--background-modifier-border); padding:18px 0; }
+.hp-modal .hp-draft-row p { white-space:pre-wrap; overflow-wrap:anywhere; }
+.hp-modal .hp-draft-row button { min-height:44px; }
+.hp-presets select,.hp-presets input,.hp-presets textarea { width:100%; min-height:44px; margin:8px 0; }
+.hp-presets label { display:block; margin-top:12px; }
+.hp-presets .hp-personal-toolbar { flex-wrap:wrap; }
+.hp-personal-library .hp-pl-markdown {font-size:15px; max-width:72ch; margin-inline:auto; white-space:normal; line-height:1.8; overflow-wrap:anywhere; }
+.hp-pl-markdown img { max-width:100%; height:auto; border-radius:10px; }
+.hp-pl-markdown blockquote { margin:14px 0; padding:4px 18px; border-inline-start:3px solid var(--interactive-accent); color:var(--text-muted); }
+.hp-pl-markdown pre { overflow-x:auto; white-space:pre; }
+.hp-renewal-overview { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.hp-root .hp-layout-undo { min-height:44px; }
+@media (max-width:767px) {
+ .hp-view .hp-root { padding-bottom:100px; }
+ .hp-quick-dock { display:flex; gap:8px; position:sticky; bottom:calc(12px + env(safe-area-inset-bottom)); margin:0 auto 12px; width:fit-content; max-width:calc(100% - 24px); z-index:8; padding:6px; border:1px solid var(--background-modifier-border); border-radius:24px; background:var(--background-primary); box-shadow:0 6px 24px #0003; }
+ .hp-quick-dock button { min-height:48px; padding:10px 24px; border-radius:18px; }
+ .hp-personal-form .modal-content { padding-bottom:0; }
+ .hp-modal .setting-item { flex-wrap:wrap; }
+}
+.hp-personal-library .hp-pl-markdown h1 {font-size:1.3em;line-height:1.5;}
+.hp-personal-library .hp-pl-markdown h2,.hp-personal-library .hp-pl-markdown h3 {font-size:1.15em;line-height:1.5;}
+.hp-personal-library .hp-pl-markdown p {margin:12px 0;}
+.hp-view[data-hp-device="phone"] .hp-root {padding-bottom:100px;}
+.hp-view[data-hp-device="phone"] .hp-quick-dock {display:flex;gap:8px;position:sticky;bottom:calc(12px + env(safe-area-inset-bottom));margin:0 auto 12px;width:fit-content;max-width:calc(100% - 24px);z-index:8;padding:6px;border:1px solid var(--background-modifier-border);border-radius:24px;background:var(--background-primary);box-shadow:0 6px 24px #0003;}
+.hp-view[data-hp-device="phone"] .hp-quick-dock button {min-height:48px;padding:10px 24px;border-radius:18px;}
+@media (prefers-reduced-motion:no-preference) {
+ .hp-quick-dock button,.hp-modal .hp-quick-choice { transition:background-color 150ms ease,box-shadow 150ms ease; }
+ .hp-quick-dock button:active,.hp-modal .hp-quick-choice:active { box-shadow:inset 0 0 0 2px var(--interactive-accent); }
+}
+
+/* Empty states must reserve real grid rows so the quick dock stays below them. */
+.hp-view .hp-grid-empty {grid-row:span 7;}

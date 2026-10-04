@@ -48,6 +48,7 @@ export interface HomePagesSettings {
   /** Glass changes presentation only; widget layouts and records stay independent. */
   material?: "glass" | "solid";
   materialOpacity?: number;
+  appearancePresets?: import("./personal/appearance-editor").AppearancePreset[];
   cardRadius?: number;
   glassBlur?: number;
   colors?: Partial<Record<"page" | "card" | "text" | "muted" | "accent" | "border" | "input", string>>;

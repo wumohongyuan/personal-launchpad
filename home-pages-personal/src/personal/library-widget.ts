@@ -1,6 +1,8 @@
-import { Notice, Setting, TFile, setIcon } from "obsidian";
+import { Component, MarkdownRenderer, Notice, Setting, TFile, setIcon } from "obsidian";
 import type { WidgetContext, WidgetDefinition } from "../widgets/types";
 import { clampInt } from "../widgets/types";
+
+import type HomePagesPlugin from "../main";
 
 type Config = Record<string, unknown>;
 type NoteKind = "reflection" | "feeling" | "quote";
@@ -19,8 +21,10 @@ interface Book extends Record<string, unknown> {
 }
 interface ReadingNote { id: string; kind: NoteKind; text: string; date: string; time: string; block: string }
 interface BookDetail { path: string; content: string; notes: ReadingNote[]; original: string; preview: string }
-interface Field { key: string; label: string; value?: string; type?: string; multiline?: boolean; hint?: string; options?: string[][]; group?: string }
+interface Field { key: string; label: string; value?: string; type?: string; multiline?: boolean; hint?: string; options?: string[][]; group?: string; vaultImage?: boolean; focus?: boolean }
 interface PersonalServices {
+  readDraft?(key:string):string;
+  writeDraft?(key:string,value:string):void;
   library: {
     list(): Promise<Book[]>;
     saveBook(input: Record<string, unknown>, original?: Book): Promise<Book>;
@@ -29,7 +33,7 @@ interface PersonalServices {
     appendNote(book: Book, text: string, kind: NoteKind, id: string, finish?: boolean): Promise<string>;
     updateNote(book: Book, note: ReadingNote, text: string): Promise<string>;
   };
-  form(title: string, fields: Field[], commit: (values: Record<string, string>) => Promise<unknown>): Promise<Record<string, string> | null>;
+  form(title: string, fields: Field[], commit: (values: Record<string, string>) => Promise<unknown>,onChange?: (values:Record<string,string>)=>void): Promise<Record<string, string> | null>;
   openFile(path: string, content?: string, subpath?: string): Promise<unknown>;
   promote(entry: { text: string; path: string; legacy: boolean }): Promise<unknown>;
 }
@@ -73,6 +77,7 @@ class LibraryPanel {
   private changedDuringForm = false;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private disposed = false;
+  private markdownChildren:Component[]=[];
 
   constructor(body: HTMLElement, private readonly ctx: WidgetContext<Config>) {
     this.personal = (ctx.plugin as unknown as { personal: PersonalServices }).personal;
@@ -128,7 +133,7 @@ class LibraryPanel {
     const vault = ctx.app.vault;
     const refs = [vault.on("create", changed), vault.on("modify", changed), vault.on("delete", changed), vault.on("rename", changed)];
     ctx.registerCleanup(() => {
-      this.disposed = true;
+      this.disposed = true;this.clearMarkdown();
       this.generation++;
       if (this.timer) clearTimeout(this.timer);
       refs.forEach(ref => vault.offref(ref));
@@ -198,7 +203,7 @@ class LibraryPanel {
         if (this.forms) { this.changedDuringForm = true; return; }
         this.controls.hidden = true;
         this.summary.hidden = true;
-        this.renderDetail(selected, detail);
+        await this.renderDetail(selected, detail,token);
       } else {
         this.selected = null;
         this.controls.hidden = false;
@@ -212,6 +217,7 @@ class LibraryPanel {
   }
 
   private renderShelf(books: Book[]): void {
+    this.clearMarkdown();
     this.content.replaceChildren();
     const words = this.query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
     const filtered = books.filter(book => (this.activeStatus === "全部" || book.status === this.activeStatus)
@@ -225,6 +231,9 @@ class LibraryPanel {
       if (!books.length) this.button(empty, "添加第一本书", () => this.editBook(), "plus");
       return;
     }
+    const last=this.personal.readDraft?.("library:last-book");
+    const resume=books.find(book=>book.id===last&&book.status==="在读")||books.find(book=>book.status==="在读");
+    if(resume&&!this.query)this.button(this.content,`继续阅读《${resume.title}》`,async()=>{this.selected=resume.id;await this.load();},"book-open",true);
     const shelf = el(this.content, "div", "hp-pl-shelf");
     for (const book of filtered.slice(0, this.shown)) {
       const card = el(shelf, "article", "hp-pl-book");
@@ -269,9 +278,17 @@ class LibraryPanel {
     return cover;
   }
 
-  private renderDetail(book: Book, detail: BookDetail): void {
+  private clearMarkdown():void {for(const child of this.markdownChildren)this.ctx.component.removeChild(child);this.markdownChildren=[];}
+  private async renderMarkdown(parent:HTMLElement,text:string,path:string):Promise<void>{
+    const child=new Component();this.ctx.component.addChild(child);this.markdownChildren.push(child);parent.classList.add("markdown-rendered","hp-pl-markdown");
+    await MarkdownRenderer.render(this.ctx.app,text,parent,path,child);
+    parent.addEventListener("click",event=>{const link=(event.target as Element).closest<HTMLAnchorElement>("a.internal-link");const href=link?.dataset.href||link?.getAttribute("href");if(href){event.preventDefault();void this.ctx.app.workspace.openLinkText(href,path);}});
+  }
+  private async renderDetail(book: Book, detail: BookDetail,token:number): Promise<void> {
+    this.clearMarkdown();
     this.content.replaceChildren();
     this.button(this.content, "回到书架", async () => { this.selected = null; await this.load(); this.root.scrollTop = 0; }, "arrow-left");
+    this.personal.writeDraft?.("library:last-book",book.id);
     const panel = el(this.content, "div", "hp-pl-detail");
     const hero = el(panel, "div", "hp-pl-book-hero"); this.cover(hero, book);
     const info = el(hero, "div", "hp-pl-book-info");
@@ -290,7 +307,7 @@ class LibraryPanel {
     for (const note of detail.notes) {
       const article = el(notes, "article", "hp-pl-note");
       const meta = el(article, "div", "hp-pl-note-meta"); el(meta, "span", "hp-pl-badge", noteNames[note.kind]); el(meta, "time", "", `${note.date} ${note.time}`);
-      el(article, "p", "hp-pl-prose", note.text);
+      await this.renderMarkdown(el(article,"div","hp-pl-prose"),note.text,detail.path);if(!this.alive(token))return;
       const actions = el(article, "div", "hp-pl-actions hp-pl-note-actions");
       this.button(actions, "编辑", () => this.editNote(book, note));
       this.button(actions, "提炼成知识", () => this.withForm(() => this.personal.promote({ text: note.text, path: detail.path, legacy: true })), "bookmark-plus");
@@ -298,7 +315,7 @@ class LibraryPanel {
     }
     if (detail.original) {
       const original = el(notes, "section", "hp-pl-original"); el(original, "h4", "", "原有摘录与笔记");
-      el(original, "p", "hp-pl-prose", detail.preview || detail.original.slice(0, 500));
+      await this.renderMarkdown(el(original,"div","hp-pl-prose"),detail.original,detail.path);if(!this.alive(token))return;
       const actions = el(original, "div", "hp-pl-actions");
       this.button(actions, "阅读全文", () => this.personal.openFile(detail.path), "file-text");
       this.button(actions, "提炼成知识", () => this.withForm(() => this.personal.promote({ text: detail.original, path: detail.path, legacy: true })), "bookmark-plus");
@@ -315,18 +332,17 @@ class LibraryPanel {
       { key: "category", label: "分类", value: book?.category || this.activeCategory, hint: "可以用文学、心理学、技术，也可以填写自己的分类。", group },
       { key: "current", label: "当前页数", type: "number", value: String(book?.current || 0), group },
       { key: "total", label: "总页数", type: "number", value: String(book?.total || 0), hint: "不知道总页数时填 0。", group },
-      { key: "cover", label: "封面（可选）", value: book?.cover || "", hint: "填写库内图片路径或 HTTPS 图片网址。留空会自动生成素色书封。", group }
+      { key: "cover", vaultImage:true, label: "封面（可选）", value: book?.cover || "", hint: "填写库内图片路径或 HTTPS 图片网址。留空会自动生成素色书封。", group }
     ], async values => { saved = await this.personal.library.saveBook({ ...values, id }, book); }));
     if (values && saved && this.alive()) { this.selected = String(saved.id); this.report(book ? "书籍资料已更新。" : "已加入图书馆。可以开始写阅读记录了。"); await this.load(); this.root.scrollTop = 0; }
   }
 
   private async writeNote(book: Book, finish = false): Promise<void> {
-    const id = newId();
-    const fields: Field[] = finish ? [] : [{ key: "kind", label: "这次想记什么", value: "reflection", options: Object.entries(noteNames) }];
-    fields.push({ key: "body", label: finish ? "读完后，哪些内容留在了心里？" : "阅读记录", value: "", multiline: true, hint: finish ? "保存心得后，这本书会标记为已读并收进书架。" : "心得、摘录或感受都可以，之后随时补充和编辑。" });
-    const values = await this.withForm(() => this.personal.form(finish ? `读完《${book.title}》` : `记录《${book.title}》`, fields,
-      values => this.personal.library.appendNote(book, values.body, finish ? "reflection" : values.kind as NoteKind, id, finish)));
-    if (values && this.alive()) { this.report(finish ? "心得已保存，这本书已收进已读书架。" : "阅读记录已保存。"); await this.load(); }
+    const key=`personal-reading:${book.id}:${finish?"finish":"note"}`;let draft:{text?:string;kind?:string;id?:string}={};try{draft=JSON.parse(this.personal.readDraft?.(key)||"{}");}catch{}if(!draft||typeof draft!=="object")draft={};let id=draft.id||newId();
+    const fields:Field[]=finish?[]:[{key:"kind",label:"记录类型",value:draft.kind||"reflection",options:Object.entries(noteNames)}];
+    fields.push({key:"body",label:finish?"这本书带给你什么？可以用在哪里？":"阅读记录",value:draft.text||"",multiline:true,focus:true,hint:finish?"保存心得后，这本书会标记为已读并收进书架。":"支持 Markdown、引用和图片；草稿自动保留。"});
+    const values=await this.withForm(()=>this.personal.form(finish?`读完《${book.title}》`:`记录《${book.title}》`,fields,async values=>{await this.personal.library.appendNote(book,values.body,finish?"reflection":values.kind as NoteKind,id,finish);this.personal.writeDraft?.(key,"");},values=>{id=newId();this.personal.writeDraft?.(key,JSON.stringify({text:values.body,kind:finish?"reflection":values.kind,id,bookId:book.id,finish}));}));
+    if(values&&this.alive()){this.report(finish?"心得已保存，这本书已收进已读书架。":"阅读记录已保存。");await this.load();}
   }
 
   private async editNote(book: Book, note: ReadingNote): Promise<void> {
@@ -355,3 +371,13 @@ export const personalLibraryWidget: WidgetDefinition<Record<string, unknown>> = 
       .addSlider(slider => slider.setLimits(1, 100, 1).setValue(clampInt(ctx.config.displayCount, 1, 100, 24)).setDynamicTooltip().onChange(value => ctx.update({ displayCount: value })));
   }
 };
+
+export async function quickReading(plugin:HomePagesPlugin,seed?:{text:string;bookId?:string;kind?:string;finish?:boolean}):Promise<void>{
+  const personal=plugin.personal,books=await personal.library.list() as Book[];
+  if(!books.length){new Notice("先在图书馆添加一本书，再写阅读心得。");return;}
+  const key=seed?`personal-reading:copy-${newId()}`:"personal-reading:quick";let saved:{text?:string;bookId?:string;kind?:string;id?:string;finish?:boolean}={};try{saved=JSON.parse(personal.readDraft(key)||"{}");}catch{}
+  if(!saved||typeof saved!=="object"||Array.isArray(saved))saved={};
+  const initial=seed||saved,bookId=initial.bookId||personal.readDraft("library:last-book")||books.find(b=>b.status==="在读")?.id||books[0].id;let noteId=seed?newId():saved.id||newId();
+  const result=await personal.form("记下阅读心得",[{key:"bookId",label:"这次读的书",value:books.some(b=>b.id===bookId)?bookId:books[0].id,options:books.map(b=>[b.id,b.title])},{key:"kind",label:"记录类型",value:initial.kind||"reflection",options:Object.entries(noteNames)},{key:"body",label:"阅读心得",focus:true,value:initial.text||"",multiline:true,hint:"支持 Markdown、引用和库内图片。"},{key:"finish",label:"保存后",value:initial.finish?"true":"false",options:[["false","继续阅读"],["true","标记已读并收纳"]],group:"阅读状态（可选）"}],async values=>{const current=(await personal.library.list() as Book[]).find(b=>b.id===values.bookId);if(!current)throw Error("这本书已不存在，请重新选择。");await personal.library.appendNote(current,values.body,values.kind,noteId,values.finish==="true");personal.writeDraft(key,"");personal.writeDraft("library:last-book",current.id);},values=>{noteId=newId();personal.writeDraft(key,JSON.stringify({id:noteId,text:values.body,bookId:values.bookId,kind:values.kind,finish:values.finish==="true"}));});
+  if(result){personal.refresh("personal-library");new Notice("阅读心得已保存。");}
+}

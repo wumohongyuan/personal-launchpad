@@ -115,6 +115,12 @@ class FinanceStore {
   async archiveEntry(id) {
     idValue(id, 240); return this.change(state => { const entry = state.entries.find(item => item.id === id); if (!entry) fail("账目不存在，请刷新后重试。"); if (!entry.archived) { entry.archived = true; entry.archivedAt = new Date().toISOString(); } return entry; });
   }
+  async restoreEntry(id) {
+    idValue(id,240);return this.change(state=>{const item=state.entries.find(v=>v.id===id);if(!item)fail("账目不存在。");item.archived=false;delete item.archivedAt;item.updatedAt=new Date().toISOString();return item;});
+  }
+  async restoreSubscription(id) {
+    idValue(id);return this.change(state=>{const item=state.subscriptions.find(v=>v.id===id);if(!item)fail("订阅不存在。");if(item.archived){item.archived=false;item.active=false;delete item.archivedAt;item.updatedAt=new Date().toISOString();}return item;});
+  }
   async saveSubscription(input) {
     if (!object(input)) fail("请填写订阅信息。");
     const id = idValue(input.id || uid()), cycle = input.cycle;
@@ -161,4 +167,4 @@ class FinanceStore {
     result.balance = result.income - result.expense; return result;
   }
 }
-module.exports = { FinanceStore, amountToCents, CYCLES, MAX_CENTS };
+module.exports = { FinanceStore, amountToCents, CYCLES, MAX_CENTS, advance, daysUntil };
