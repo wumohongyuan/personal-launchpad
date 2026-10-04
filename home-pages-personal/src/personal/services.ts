@@ -19,6 +19,8 @@ export interface PersonalSettings {
 export interface FormField {
   key: string; label: string; value?: string | number; hint?: string;
   type?: string; multiline?: boolean; options?: Array<[string, string]>;
+  /** Optional fields remain part of the form even while their section is closed. */
+  group?: string;
 }
 export function personalSettings(raw: unknown): PersonalSettings { return {...settingsFrom(raw),renewalReminders:(raw as Partial<PersonalSettings>|null)?.renewalReminders!==false} as PersonalSettings; }
 
@@ -30,8 +32,19 @@ class PersonalForm extends Modal {
   onOpen(): void {
     this.modalEl.addClass("hp-modal", "hp-personal-form");this.titleEl.setText(this.title);
     const form=this.contentEl.createEl("form"), controls: Record<string,HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement>={};
+    const groups = new Map<string, HTMLDetailsElement>();
     for(const field of this.fields) {
-      const row=form.createDiv({cls:"hp-personal-field"}),id=`hp-field-${uid()}`;
+      let parent: HTMLElement = form;
+      if (field.group) {
+        let group = groups.get(field.group);
+        if (!group) {
+          group = form.createEl("details", { cls: "hp-disclosure" });
+          group.createEl("summary", { text: field.group });
+          groups.set(field.group, group);
+        }
+        parent = group;
+      }
+      const row=parent.createDiv({cls:"hp-personal-field"}),id=`hp-field-${uid()}`;
       row.createEl("label",{text:field.label,attr:{for:id}});
       let input: HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement;
       if(field.options) {const select=row.createEl("select",{attr:{id}});for(const [value,label] of field.options)select.createEl("option",{value,text:label});input=select;}
@@ -46,8 +59,12 @@ class PersonalForm extends Modal {
     form.addEventListener("submit",event=>{
       event.preventDefault();if(this.busy||this.disposed)return;this.busy=true;save.disabled=true;cancel.disabled=true;save.setText("正在保存…");
       const values=Object.fromEntries(Object.entries(controls).map(([key,input])=>[key,input.value]));Object.values(controls).forEach(input=>input.disabled=true);error.empty();
-      void Promise.resolve().then(()=>{if(!this.disposed)return this.commit(values);}).then(()=>{if(this.disposed)return;this.completed=true;this.result(values);this.busy=false;this.close();}).catch((reason: unknown)=>{if(!this.disposed)error.setText(reason instanceof Error?reason.message:"保存失败，输入已保留。");}).finally(()=>{this.busy=false;if(this.disposed)return;save.disabled=false;cancel.disabled=false;save.setText("保存");Object.values(controls).forEach(input=>input.disabled=false);});
+      void Promise.resolve().then(()=>{if(!this.disposed)return this.commit(values);}).then(()=>{if(this.disposed)return;this.completed=true;this.result(values);this.busy=false;this.close();}).catch((reason: unknown)=>{if(!this.disposed){for(const group of groups.values())group.open=true;error.setText(reason instanceof Error?reason.message:"保存失败，输入已保留。");}}).finally(()=>{this.busy=false;if(this.disposed)return;save.disabled=false;cancel.disabled=false;save.setText("保存");Object.values(controls).forEach(input=>input.disabled=false);});
     });
+    form.addEventListener("invalid", event => {
+      const group = (event.target as HTMLElement).closest("details");
+      if (group) group.open = true;
+    }, true);
     form.addEventListener("keydown",event=>{if(!event.isComposing&&(event.ctrlKey||event.metaKey)&&event.key==="Enter"){event.preventDefault();form.requestSubmit();}});
     window.setTimeout(()=>Object.values(controls)[0]?.focus(),50);
   }

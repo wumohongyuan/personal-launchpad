@@ -172,27 +172,34 @@ class FinancePanel {
 
   private async editEntry(entry?: Entry): Promise<void> {
     const entryId = entry?.id || id();
+    const group = entry ? undefined : "日期、收支类型与备注";
+    let lastCategory = "";
+    try { lastCategory = this.personal.readDraft("finance:last-category"); } catch { /* A preference never blocks a ledger entry. */ }
     const result = await this.form(entry ? "编辑账目" : "记一笔收支", [
-      { key: "type", label: "收支类型", value: entry?.type || "expense", options: entry?.subscriptionId ? [["expense", "支出（订阅续费）"]] : [["expense", "支出"], ["income", "收入"]] },
-      { key: "amount", label: "金额（元）", type: "number", value: entry ? (entry.amount / 100).toFixed(2) : "", hint: "人民币，最多两位小数。" },
-      { key: "date", label: "日期", type: "date", value: entry?.date || today() },
-      { key: "category", label: "分类", value: entry?.category || "", hint: "例如餐饮、交通、学习、订阅、工资；可填写自己的分类。" },
-      { key: "note", label: "备注（可选）", value: entry?.note || "", multiline: true }
-    ], values => this.personal.finance.saveEntry({ ...values, id: entryId }));
+      { key: "amount", label: "金额（元）", type: "number", value: entry ? (entry.amount / 100).toFixed(2) : "", hint: entry ? "人民币，最多两位小数。" : "默认记为今天的支出；展开下方选项可改为收入或补记其他日期。" },
+      { key: "category", label: "分类", value: entry?.category ?? lastCategory, hint: "餐饮、交通、学习……也可以填写自己的分类。" },
+      { key: "type", label: "收支类型", value: entry?.type || "expense", options: entry?.subscriptionId ? [["expense", "支出（订阅续费）"]] : [["expense", "支出"], ["income", "收入"]], group },
+      { key: "date", label: "日期", type: "date", value: entry?.date || today(), group },
+      { key: "note", label: "备注（可选）", value: entry?.note || "", multiline: true, group }
+    ], async values => {
+      await this.personal.finance.saveEntry({ ...values, id: entryId });
+      try { this.personal.writeDraft("finance:last-category", values.category.trim()); } catch { /* Ledger was saved successfully. */ }
+    });
     if (result && this.alive()) { this.report("账目已保存。"); await this.refresh(); }
   }
 
   private async editSubscription(subscription?: Subscription): Promise<void> {
     const subscriptionId = subscription?.id || id();
+    const group = subscription ? undefined : "提醒与补充信息";
     const result = await this.form(subscription ? "编辑会员或订阅" : "添加会员或订阅", [
       { key: "name", label: "服务名称", value: subscription?.name || "", hint: "例如视频会员、云存储、软件服务。" },
       { key: "amount", label: "每期费用（元）", type: "number", value: subscription ? (subscription.amount / 100).toFixed(2) : "" },
       { key: "cycle", label: "缴费周期", value: subscription?.cycle || "monthly", options: Object.entries(cycleNames) },
-      { key: "nextDue", label: "下次到期日", type: "date", value: subscription?.nextDue || today() },
-      { key: "remindDays", label: "提前几天提醒", type: "number", value: String(subscription?.remindDays ?? 3), hint: "0 表示当天提醒，打开 Obsidian 时检查。" },
-      { key: "active", label: "使用状态", value: subscription?.active === false ? "false" : "true", options: [["true", "启用并提醒"], ["false", "已停用，不提醒"]] },
-      { key: "url", label: "服务网址（可选）", type: "url", value: subscription?.url || "" },
-      { key: "note", label: "备注（可选）", value: subscription?.note || "", multiline: true }
+      { key: "nextDue", label: "下次到期日", type: "date", value: subscription?.nextDue || today(), hint: subscription ? undefined : "默认启用并提前 3 天提醒，下方可以调整。" },
+      { key: "remindDays", label: "提前几天提醒", type: "number", value: String(subscription?.remindDays ?? 3), hint: "0 表示当天提醒，打开 Obsidian 时检查。", group },
+      { key: "active", label: "使用状态", value: subscription?.active === false ? "false" : "true", options: [["true", "启用并提醒"], ["false", "已停用，不提醒"]], group },
+      { key: "url", label: "服务网址（可选）", type: "url", value: subscription?.url || "", group },
+      { key: "note", label: "备注（可选）", value: subscription?.note || "", multiline: true, group }
     ], values => this.personal.finance.saveSubscription({ ...values, id: subscriptionId, active: values.active === "true" }));
     if (result && this.alive()) { this.report("会员或订阅已保存。"); await this.refresh(); }
   }

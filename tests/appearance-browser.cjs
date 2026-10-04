@@ -13,7 +13,7 @@ const out=path.resolve(__dirname,"../test-results");fs.mkdirSync(out,{recursive:
     await load();
     const view=page.locator('.hp-view'),card=page.locator('.hp-card-personal-capture');
     const editor=()=>page.getByRole('dialog',{name:'外观与配色'});
-    const open=()=>page.getByRole('button',{name:'外观配色',exact:true}).click();
+    const open=async()=>{await page.getByRole('button',{name:'自定义',exact:true}).click();await page.getByRole('menuitem',{name:'外观与配色',exact:true}).click();};
     const style=async(el,prop)=>el.evaluate((el,prop)=>getComputedStyle(el).getPropertyValue(prop).trim(),prop);
     const range=async(id,value)=>page.locator('#'+id).evaluate((el,value)=>{el.value=String(value);el.dispatchEvent(new Event('input',{bubbles:true}));},value);
     const preserve=async()=>assert.equal(await page.evaluate(()=>window.savedComposer===document.querySelector('.hp-personal-compose-input')),true,'appearance keeps composer DOM, cursor and undo state');
@@ -21,10 +21,10 @@ const out=path.resolve(__dirname,"../test-results");fs.mkdirSync(out,{recursive:
     await page.evaluate(()=>{window.savedComposer=document.querySelector('.hp-personal-compose-input');window.savedComposer.setSelectionRange(2,4);});
     assert.equal(await view.getAttribute('data-hp-material'),'glass');
     assert.match(await style(card,'backdrop-filter'),/blur/);
-    await page.getByRole('button',{name:'液态玻璃',exact:true}).click();
+    await open();await editor().getByRole('combobox',{name:'组件材质',exact:true}).selectOption('solid');await editor().getByRole('button',{name:'保存配色',exact:true}).click();
     assert.equal(await view.getAttribute('data-hp-material'),'solid');await preserve();
     assert.equal(await style(card,'backdrop-filter'),'none');
-    await page.getByRole('button',{name:'液态玻璃',exact:true}).click();
+    await open();await editor().getByRole('combobox',{name:'组件材质',exact:true}).selectOption('glass');await editor().getByRole('button',{name:'保存配色',exact:true}).click();
     const base=await style(view,'background-color');
     await open();
     for(const [name,value] of [['页面背景','#263347'],['卡片底色','#31574a'],['正文与标题','#f2f8f3'],['次要文字','#b9d4c2'],['强调色','#dbbd74'],['边框与高光','#658775'],['输入框底色','#142e28']])await editor().getByLabel(name,{exact:true}).fill(value);
@@ -56,7 +56,7 @@ const out=path.resolve(__dirname,"../test-results");fs.mkdirSync(out,{recursive:
     assert.equal(await style(card,'--hp-accent'),'#4abf96');await preserve();
     await page.evaluate(()=>window.__hpPreview.vault.failWrites=false);
     const widget=()=>page.getByRole('dialog',{name:/配置组件/});
-    const openWidget=()=>card.getByRole('button',{name:'配置组件',exact:true}).click();
+    const openWidget=async()=>{await card.getByRole('button',{name:'配置组件',exact:true}).click();await widget().getByText('外观配色',{exact:true}).click();};
     await openWidget();await widget().getByLabel('组件强调色',{exact:true}).fill('#b09ee8');
     await widget().getByLabel('组件卡片底色',{exact:true}).fill('#29334d');
     await widget().getByLabel('组件文字颜色',{exact:true}).fill('#e5eeff');
@@ -81,6 +81,7 @@ const out=path.resolve(__dirname,"../test-results");fs.mkdirSync(out,{recursive:
     assert.equal(await style(card,'--hp-accent'),'#4abf96');
     results.push('individual colors preview/cancel/save/reload/inherit and write-failure rollback; no composer rebuild');
     await page.locator('.hp-card-pomodoro').getByRole('button',{name:'配置组件',exact:true}).click();
+    await widget().getByText('外观配色',{exact:true}).click();
     await widget().getByLabel('组件强调色',{exact:true}).fill('#aabbcc');
     await page.evaluate(()=>{
       const widget=window.__hpPreview.plugin.getActivePage().widgets.find(item=>item.kind==='pomodoro');

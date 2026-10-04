@@ -1,6 +1,6 @@
 {
   "name": "personal-launchpad",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": true,
   "description": "基于 Home Pages 的个人工作台：自由布局、随手记、日记、图书馆、成长与知识库。",
   "scripts": {

@@ -19,7 +19,7 @@ interface Book extends Record<string, unknown> {
 }
 interface ReadingNote { id: string; kind: NoteKind; text: string; date: string; time: string; block: string }
 interface BookDetail { path: string; content: string; notes: ReadingNote[]; original: string; preview: string }
-interface Field { key: string; label: string; value?: string; type?: string; multiline?: boolean; hint?: string; options?: string[][] }
+interface Field { key: string; label: string; value?: string; type?: string; multiline?: boolean; hint?: string; options?: string[][]; group?: string }
 interface PersonalServices {
   library: {
     list(): Promise<Book[]>;
@@ -307,13 +307,15 @@ class LibraryPanel {
 
   private async editBook(book?: Book): Promise<void> {
     const id = book?.id || newId(); let saved: Book | undefined;
+    const group = book ? undefined : "补充书籍资料（可选）";
     const values = await this.withForm(() => this.personal.form(book ? "编辑书籍资料" : "添加一本书", [
-      { key: "title", label: "书名", value: book?.title || "" }, { key: "author", label: "作者", value: book?.author || "" },
-      { key: "status", label: "阅读状态", value: book?.status || "想读", options: statuses.map(status => [status, status]) },
-      { key: "category", label: "分类", value: book?.category || this.activeCategory, hint: "可以用文学、心理学、技术，也可以填写自己的分类。" },
-      { key: "current", label: "当前页数", type: "number", value: String(book?.current || 0) },
-      { key: "total", label: "总页数", type: "number", value: String(book?.total || 0), hint: "不知道总页数时填 0。" },
-      { key: "cover", label: "封面（可选）", value: book?.cover || "", hint: "填写库内图片路径或 HTTPS 图片网址。留空会自动生成素色书封。" }
+      { key: "title", label: "书名", value: book?.title || "", hint: book ? undefined : "先加入想读书架，其他资料以后随时补充。" },
+      { key: "author", label: "作者", value: book?.author || "", group },
+      { key: "status", label: "阅读状态", value: book?.status || "想读", options: statuses.map(status => [status, status]), group },
+      { key: "category", label: "分类", value: book?.category || this.activeCategory, hint: "可以用文学、心理学、技术，也可以填写自己的分类。", group },
+      { key: "current", label: "当前页数", type: "number", value: String(book?.current || 0), group },
+      { key: "total", label: "总页数", type: "number", value: String(book?.total || 0), hint: "不知道总页数时填 0。", group },
+      { key: "cover", label: "封面（可选）", value: book?.cover || "", hint: "填写库内图片路径或 HTTPS 图片网址。留空会自动生成素色书封。", group }
     ], async values => { saved = await this.personal.library.saveBook({ ...values, id }, book); }));
     if (values && saved && this.alive()) { this.selected = String(saved.id); this.report(book ? "书籍资料已更新。" : "已加入图书馆。可以开始写阅读记录了。"); await this.load(); this.root.scrollTop = 0; }
   }

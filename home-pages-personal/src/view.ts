@@ -267,23 +267,31 @@ export class HomeView extends ItemView {
         this.showPageMenu(page, event);
       });
     }
-    const add = this.tabsEl.createEl("button", { cls: "hp-tab hp-tab-add", attr: { type: "button", "aria-label": "新建页面", title: "新建页面" } });
-    setIcon(add, "plus");
-    add.addEventListener("click", () => {
-      new PromptModal(this.app, { title: "新建页面", placeholder: "页面名称" }, async (name) => {
+    const capture=this.tabsEl.createEl("button",{cls:"hp-tab hp-personal-quick-capture",text:"随手记",attr:{type:"button",title:"跳到记录输入框"}});
+    capture.addEventListener("click",()=>void this.focusCapture());
+    const customize=this.tabsEl.createEl("button",{cls:"hp-tab hp-customize-button",text:"自定义",attr:{type:"button","aria-haspopup":"menu"}});
+    customize.addEventListener("click",()=>this.showCustomization(customize));
+    if (this.editing) {
+      const done=this.tabsEl.createEl("button",{cls:"hp-tab hp-personal-edit",text:"完成编辑",attr:{type:"button"}});
+      done.addEventListener("click",()=>this.toggleEditing(false));
+    }
+  }
+
+  private showCustomization(anchor: HTMLElement): void {
+    const menu = new Menu();
+    menu.addItem(item=>item.setTitle(this.editing ? "完成布局调整" : "调整布局").setIcon("layout-dashboard").onClick(()=>this.toggleEditing()));
+    menu.addItem(item=>item.setTitle("外观与配色").setIcon("palette").onClick(()=>openAppearanceEditor(this.plugin)));
+    menu.addItem(item=>item.setTitle("添加组件").setIcon("plus").onClick(()=>this.promptAddWidget()));
+    menu.addSeparator();
+    menu.addItem(item=>item.setTitle("新建页面").setIcon("file-plus").onClick(()=>{
+      new PromptModal(this.app, { title: "新建页面", placeholder: "页面名称" }, async name=>{
         const page: HomePage = { id: createId("page"), name, widgets: [] };
         this.plugin.settings.pages.push(page);
         await this.switchPage(page.id);
       }).open();
-    });
-    const capture=this.tabsEl.createEl("button",{cls:"hp-tab hp-personal-quick-capture",text:"随手记",attr:{type:"button",title:"跳到记录输入框"}});
-    capture.addEventListener("click",()=>void this.focusCapture());
-    const customize=this.tabsEl.createEl("button",{cls:"hp-tab hp-appearance-button",text:"外观配色",attr:{type:"button"}});
-    customize.addEventListener("click",()=>openAppearanceEditor(this.plugin));
-    const material=this.tabsEl.createEl("button",{cls:"hp-tab hp-material-toggle",text:this.plugin.settings.material==="solid"?"原版卡片":"液态玻璃",attr:{type:"button","aria-label":"液态玻璃","aria-pressed":String(this.plugin.settings.material!=="solid"),title:"切换液态玻璃与原版卡片"}});
-    material.addEventListener("click",()=>void this.toggleMaterial());
-    const edit=this.tabsEl.createEl("button",{cls:"hp-tab hp-personal-edit",text:this.editing?"完成编辑":"编辑工作台",attr:{type:"button","aria-pressed":String(this.editing)}});
-    edit.addEventListener("click",()=>this.toggleEditing());
+    }));
+    const rect=anchor.getBoundingClientRect();
+    menu.showAtPosition({x:Math.max(8,Math.min(rect.left,anchor.ownerDocument.defaultView!.innerWidth-220)),y:rect.bottom+4});
   }
 
   private async focusCapture():Promise<void> {
@@ -295,22 +303,6 @@ export class HomeView extends ItemView {
     if(this.closed||!this.plugin.active)return;
     if(input) {input.scrollIntoView({block:"center",behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"});input.focus({preventScroll:true});}
     else new Notice("在编辑工作台中添加「随手记录」组件，即可从这里开始记录。");
-  }
-
-  private async toggleMaterial():Promise<void> {
-    const previous=this.plugin.settings.material;
-    this.plugin.settings.material=previous==="solid"?"glass":"solid";
-    this.applyLayout();
-    let button=this.tabsEl.querySelector<HTMLButtonElement>(".hp-material-toggle");
-    if(button)button.disabled=true;
-    try {await this.plugin.saveSettings();}
-    catch {this.plugin.settings.material=previous;this.applyLayout();}
-    finally {
-      if(!this.closed&&this.plugin.active) {
-        button=this.tabsEl.querySelector<HTMLButtonElement>(".hp-material-toggle");
-        if(button){button.disabled=false;button.focus({preventScroll:true});}
-      }
-    }
   }
 
   private renderToolbar(): void {
@@ -325,11 +317,6 @@ export class HomeView extends ItemView {
     setIcon(add.createSpan({ cls: "hp-button-icon" }), "plus");
     add.createSpan({ text: "添加组件" });
     add.addEventListener("click", () => this.promptAddWidget());
-
-    const paste = actions.createEl("button", { cls: "hp-button", attr: { type: "button", title: "直接粘贴代码注册并添加新组件" } });
-    setIcon(paste.createSpan({ cls: "hp-button-icon" }), "code");
-    paste.createSpan({ text: "粘贴组件" });
-    paste.addEventListener("click", () => this.promptPasteWidget());
 
     const done = actions.createEl("button", { cls: "hp-button mod-cta", attr: { type: "button" } });
     setIcon(done.createSpan({ cls: "hp-button-icon" }), "check");

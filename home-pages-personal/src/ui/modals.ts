@@ -64,6 +64,7 @@ export class WidgetSettingsModal extends Modal {
 
   private renderBody(): void {
     const container = this.bodyEl;
+    const expanded = new Set(Array.from(container.querySelectorAll<HTMLDetailsElement>("details[open]"), element => element.dataset.section));
     container.empty();
     const definition = getWidgetDefinition(this.draft.kind);
 
@@ -71,32 +72,33 @@ export class WidgetSettingsModal extends Modal {
       .addText((text) => text.setPlaceholder(definition?.name ?? "").setValue(this.draft.title ?? "").onChange((value) => {
         this.draft.title = value.trim() || undefined;
       }));
-    new Setting(container).setName("宽度（列）").setDesc(`网格共 ${MAX_COLUMNS} 列。`)
+    if (definition) {
+      const ctx: WidgetSettingsContext<Record<string, unknown>> = {
+        app: this.app, plugin: this.plugin, config: this.draftConfig,
+        update: patch => { Object.assign(this.draftConfig, patch); },
+        refresh: () => this.renderBody()
+      };
+      definition.renderSettings(container, ctx);
+    }
+    const section = (name: string): HTMLElement => {
+      const details = container.createEl("details", { cls: "hp-disclosure", attr: { "data-section": name } });
+      details.open = expanded.has(name);
+      details.createEl("summary", { text: name });
+      return details.createDiv({ cls: "hp-disclosure-content" });
+    };
+    this.renderColors(section("外观配色"));
+    const layout = section("布局尺寸");
+    new Setting(layout).setName("宽度（列）").setDesc(`网格共 ${MAX_COLUMNS} 列。`)
       .addSlider((slider) => slider.setLimits(1, MAX_COLUMNS, 1).setValue(this.draft.w).setDynamicTooltip().onChange((value) => {
         this.draft.w = value;
       }));
-    new Setting(container).setName("高度（行）").setDesc("行高可在插件设置中调整。")
+    new Setting(layout).setName("高度（行）").setDesc("行高可在插件设置中调整。")
       .addSlider((slider) => slider.setLimits(1, MAX_ROWS, 1).setValue(this.draft.h).setDynamicTooltip().onChange((value) => {
         this.draft.h = value;
       }));
-
-    this.renderColors(container);
-    if (!definition) return;
-    container.createEl("h3", { cls: "hp-modal-section", text: "组件设置" });
-    const ctx: WidgetSettingsContext<Record<string, unknown>> = {
-      app: this.app,
-      plugin: this.plugin,
-      config: this.draftConfig,
-      update: (patch) => {
-        Object.assign(this.draftConfig, patch);
-      },
-      refresh: () => this.renderBody()
-    };
-    definition.renderSettings(container, ctx);
   }
 
   private renderColors(container: HTMLElement): void {
-    container.createEl("h3", { cls: "hp-modal-section", text: "组件配色" });
     container.createEl("p", { cls: "hp-color-intro", text: "只调整这个组件，边选边预览。继承默认时使用全局配色；全局未设时使用主题或组件默认色。取消不会保存。" });
     const grid = container.createDiv({ cls: "hp-color-grid" });
     const appearance = this.plugin.settings.appearance;
@@ -113,9 +115,6 @@ export class WidgetSettingsModal extends Modal {
       const controls = row.createDiv({ cls: "hp-color-controls" });
       const picker = controls.createEl("input", { cls: "hp-color-picker", attr: { id, type: "color", "aria-label": `组件${title}` } });
       const reset = controls.createEl("button", { cls: "hp-color-reset", text: "恢复继承", attr: { type: "button", "aria-label": `${title}恢复继承` } });
-      const inheritLabel = row.createEl("label", { cls: "hp-color-inherit" });
-      const inherit = inheritLabel.createEl("input", { attr: { type: "checkbox", "aria-label": `${title}继承默认` } });
-      inheritLabel.createSpan({ text: "继承默认" });
       const state = row.createEl("small", { cls: "hp-color-state", attr: { role: "status" } });
       const inheritedColor = (): string => {
         const color = this.plugin.settings.colors?.[key] ?? fallback[key];
@@ -124,7 +123,6 @@ export class WidgetSettingsModal extends Modal {
       const sync = (): void => {
         const color = this.draft.colors?.[key];
         picker.value = color ?? inheritedColor();
-        inherit.checked = !color;
         reset.disabled = !color;
         state.setText(color ? "仅此组件 · 自定义" : "跟随全局 / 默认");
       };
@@ -138,10 +136,6 @@ export class WidgetSettingsModal extends Modal {
         if (!/^#[0-9a-f]{6}$/i.test(picker.value)) return;
         this.draft.colors = { ...this.draft.colors, [key]: picker.value.toLowerCase() };
         preview();
-      });
-      inherit.addEventListener("change", () => {
-        if (inherit.checked) restore();
-        else { this.draft.colors = { ...this.draft.colors, [key]: picker.value }; preview(); }
       });
       reset.addEventListener("click", restore);
       sync();
@@ -171,43 +165,18 @@ export class AddWidgetModal extends Modal {
   }
 
   onOpen(): void {
-    this.modalEl.addClass("hp-modal");
+    this.modalEl.addClass("hp-modal", "hp-widget-catalog");
     this.titleEl.setText("添加组件");
-
-    if (this.onPaste) {
-      const topBar = this.contentEl.createDiv({ cls: "hp-add-topbar" });
-      topBar.createDiv({ cls: "hp-add-topbar-text", text: "想使用自定义代码或脚本卡片？" });
-
-      const pasteBtn = topBar.createEl("button", {
-        cls: "mod-cta",
-        text: "📋 粘贴代码新建组件"
-      });
-      pasteBtn.addEventListener("click", () => {
-        this.close();
-        this.onPaste?.();
-      });
-    }
-
+    const search = this.contentEl.createEl("input", { cls: "hp-widget-search", attr: { type: "search", "aria-label": "搜索组件", placeholder: "搜索名称或用途，例如阅读、时钟…" } });
     const grid = this.contentEl.createDiv({ cls: "hp-add-grid" });
-
-    if (this.onPaste) {
-      const pasteCard = grid.createDiv({ cls: "hp-add-card hp-add-card-paste" });
-      setIcon(pasteCard.createDiv({ cls: "hp-add-icon" }), "code-xml");
-      const ptext = pasteCard.createDiv({ cls: "hp-add-text" });
-      ptext.createDiv({ cls: "hp-add-name", text: "＋ 粘贴代码新建组件" });
-      ptext.createDiv({ cls: "hp-add-desc", text: "直接粘贴一段 JavaScript 脚本创建并加入当前首页" });
-      pasteCard.addEventListener("click", () => {
-        this.close();
-        this.onPaste?.();
-      });
-    }
-
+    const entries: Array<{ card: HTMLElement; keywords: string }> = [];
     for (const definition of listWidgetDefinitions()) {
       const isCustom = !isBuiltinKind(definition.kind) && (this.plugin?.customWidgetManager.hasKind(definition.kind) ?? false);
       const card = grid.createDiv({ cls: `hp-add-card${isCustom ? " hp-add-card-user" : ""}` });
       card.style.setProperty("--hp-accent", definition.accent);
-      setIcon(card.createDiv({ cls: "hp-add-icon" }), definition.icon);
-      const text = card.createDiv({ cls: "hp-add-text" });
+      const pick = card.createEl("button", { cls: "hp-add-select", attr: { type: "button", "aria-label": `添加${definition.name}` } });
+      setIcon(pick.createSpan({ cls: "hp-add-icon", attr: { "aria-hidden": "true" } }), definition.icon);
+      const text = pick.createSpan({ cls: "hp-add-text" });
       const nameRow = text.createDiv({ cls: "hp-add-name-row" });
       nameRow.createDiv({ cls: "hp-add-name", text: definition.name });
       if (isCustom) {
@@ -229,10 +198,29 @@ export class AddWidgetModal extends Modal {
         });
       }
 
-      card.addEventListener("click", () => {
+      pick.addEventListener("click", () => {
         this.close();
         this.onPick(definition.kind);
       });
+      entries.push({ card, keywords: `${definition.name} ${definition.description} ${definition.kind}`.toLocaleLowerCase() });
+    }
+    const empty = this.contentEl.createEl("p", { cls: "hp-color-intro", text: "没有匹配的组件，试试其他名称或用途。", attr: { role: "status" } });
+    empty.hidden = true;
+    search.addEventListener("input", () => {
+      const words = search.value.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+      let count = 0;
+      for (const entry of entries) {
+        const visible = words.every(word => entry.keywords.includes(word));
+        entry.card.hidden = !visible;
+        if (visible) count += 1;
+      }
+      empty.hidden = count > 0;
+    });
+    if (this.onPaste) {
+      const advanced = this.contentEl.createEl("details", { cls: "hp-disclosure" });
+      advanced.createEl("summary", { text: "高级：脚本组件" });
+      const paste = advanced.createEl("button", { text: "粘贴代码新建组件", attr: { type: "button" } });
+      paste.addEventListener("click", () => { this.close(); this.onPaste?.(); });
     }
   }
 

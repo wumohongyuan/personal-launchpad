@@ -5454,3 +5454,68 @@
   .hp-opacity-row input { max-width: none; }
   .hp-color-controls .hp-color-hex { font-size: 16px; }
 }
+
+
+/* src/personal/simplified-controls.css */
+/* Progressive controls keep everyday actions visible and retain all optional fields. */
+.hp-modal .hp-disclosure {
+  margin: 16px 0;
+  padding: 0 14px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  background: var(--background-primary-alt);
+}
+.hp-modal .hp-disclosure > summary {
+  min-height: 46px;
+  padding: 13px 0;
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--text-normal);
+  cursor: pointer;
+  line-height: 1.5;
+}
+.hp-modal .hp-disclosure > summary::marker { color: var(--text-muted); }
+.hp-modal .hp-disclosure > summary:focus-visible,
+.hp-widget-catalog .hp-add-select:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+.hp-modal .hp-disclosure[open] > summary { border-bottom: 1px solid var(--background-modifier-border); }
+.hp-modal .hp-disclosure-content { padding: 4px 0 12px; }
+.hp-modal .hp-disclosure > button { margin: 12px 0; min-height: 44px; }
+.hp-modal .hp-disclosure .hp-color-grid { margin: 12px 0 0; }
+.hp-widget-catalog .hp-widget-search { width: 100%; min-height: 44px; margin-bottom: 16px; }
+.hp-widget-catalog .hp-add-card { display: block; padding: 0; border: 1px solid var(--background-modifier-border); }
+.hp-widget-catalog .hp-add-card[hidden] { display: none; }
+.hp-widget-catalog .hp-add-select {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+  min-height: 88px;
+  padding: 14px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-normal);
+  text-align: left;
+  white-space: normal;
+  cursor: pointer;
+}
+.hp-widget-catalog .hp-add-select:hover { background: transparent; }
+.hp-widget-catalog .hp-add-text { min-width: 0; }
+.hp-widget-catalog .hp-add-desc { color: var(--text-muted); font-size: 12px; line-height: 1.55; }
+.hp-widget-catalog .hp-add-card-user .hp-add-select { padding-right: 48px; }
+.hp-widget-catalog .hp-add-card-del { width: 44px; height: 44px; top: 2px; right: 2px; }
+.hp-widget-catalog .hp-add-grid { grid-template-columns: repeat(auto-fill,minmax(min(210px,100%),1fr)); }
+@media (prefers-reduced-motion:no-preference) {
+  .hp-modal .hp-disclosure[open] > .hp-disclosure-content,
+  .hp-modal .hp-disclosure[open] > .hp-personal-field { animation: hp-options-appear 140ms ease-out; }
+  @keyframes hp-options-appear { from { opacity: .4; } to { opacity: 1; } }
+}
+@media (pointer:coarse) {
+  .hp-widget-catalog .hp-widget-search { font-size: 16px; }
+}
